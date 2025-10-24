@@ -141,7 +141,6 @@ function HomeScreen() {
     };
 
     const onRegionChanged = (newRegion: Region) => {
-        console.log('Region changed to:', newRegion);
     };
 
     return (
