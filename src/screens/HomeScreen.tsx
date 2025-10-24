@@ -1,10 +1,9 @@
 import ThemedButton from '@/src/components/ThemedButton';
 import theme from '@/src/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
-import groupPositions from '../../mock/groupPositions.json';
 import { onAuthStateChange } from '../services/authService';
 import { getGroupPositions, getUserGroups, GroupMember } from '../services/databaseService';
 
@@ -53,6 +52,16 @@ const styles = StyleSheet.create({
 
 type Position = { latitude: number; longitude: number };
 function computeRegion(positions: Position[]) {
+    if (positions.length === 0) {
+        // Default region when no positions available
+        return {
+            latitude: 50.9380,
+            longitude: 6.9578,
+            latitudeDelta: 0.1,
+            longitudeDelta: 0.1
+        };
+    }
+
     const lats = positions.map((p) => p.latitude);
     const lons = positions.map((p) => p.longitude);
     const minLat = Math.min(...lats);
@@ -72,13 +81,6 @@ function HomeScreen() {
     const [region, setRegion] = useState<Region>();
     const [user, setUser] = useState<any>(null);
     const [allPositions, setAllPositions] = useState<{ [groupId: string]: { [userId: string]: GroupMember } }>({});
-
-    const initialRegion = computeRegion(groupPositions);
-
-    useEffect(() => {
-        setRegion(initialRegion);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
 
     useEffect(() => {
         const unsubscribeAuth = onAuthStateChange((currentUser) => {
@@ -120,13 +122,8 @@ function HomeScreen() {
         };
     }, [user]);
 
-    // Center map on current user (for now, initial region)
-    const centerOnUser = () => {
-        mapRef.current?.animateToRegion(initialRegion, 1000);
-    };
-
     // Get all positions from all groups
-    const getAllMemberPositions = () => {
+    const getAllMemberPositions = useCallback(() => {
         const positions: { latitude: number; longitude: number; id: string }[] = [];
 
         Object.values(allPositions).forEach((groupPositions) => {
@@ -142,7 +139,48 @@ function HomeScreen() {
         });
 
         return positions;
+    }, [allPositions]);
+
+    // Update region whenever positions change
+    useEffect(() => {
+        const memberPositions = getAllMemberPositions();
+        const newRegion = computeRegion(memberPositions);
+        setRegion(newRegion);
+    }, [getAllMemberPositions]);
+
+    // Center map on current user position
+    const centerOnUser = () => {
+        if (!user) return;
+
+        // Find the current user's position
+        const userPosition = (() => {
+            for (const groupPositions of Object.values(allPositions)) {
+                const userPos = groupPositions[user.uid];
+                if (userPos && userPos.latitude && userPos.longitude) {
+                    return {
+                        latitude: userPos.latitude,
+                        longitude: userPos.longitude
+                    };
+                }
+            }
+            return null;
+        })();
+
+        if (userPosition) {
+            // Create a region centered on the user's position with a reasonable zoom
+            const userRegion = {
+                latitude: userPosition.latitude,
+                longitude: userPosition.longitude,
+                latitudeDelta: 0.01, // Closer zoom level
+                longitudeDelta: 0.01
+            };
+            mapRef.current?.animateToRegion(userRegion, 1000);
+        }
     };
+
+    const onRegionChanged = (newRegion: Region) => {
+        console.log('Region changed to:', newRegion);
+    }
 
     const memberPositions = getAllMemberPositions();
 
@@ -152,9 +190,8 @@ function HomeScreen() {
                 ref={mapRef}
                 provider={PROVIDER_GOOGLE}
                 style={styles.map}
-                initialRegion={initialRegion}
                 region={region}
-                onRegionChangeComplete={setRegion}
+                onRegionChangeComplete={onRegionChanged}
             >
                 {/* Show group members as profile icons with down arrows */}
                 {memberPositions.map((member) => (
@@ -162,6 +199,7 @@ function HomeScreen() {
                         key={member.id}
                         coordinate={{ latitude: member.latitude, longitude: member.longitude }}
                         anchor={{ x: 0.5, y: 1 }}
+                        tracksViewChanges={false}
                     >
                         <View style={styles.profileMarkerContainer}>
                             {/* Custom marker content can be added here */}
