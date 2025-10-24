@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     button: {
         paddingHorizontal: theme.Spacing.Gap.Md,
         paddingVertical: theme.Spacing.Gap.Md / 2,
-        borderRadius: theme.Spacing.Borders.Md,
+        borderRadius: theme.Spacing.Borders.Xl,
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: 44, // For accessibility

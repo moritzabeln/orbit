@@ -1,7 +1,8 @@
 
 const Spacing = {
     Borders: {
-        Md: 8,
+        Md: 12,
+        Xl: 32,
     },
     Gap: {
         Md: 16,
@@ -37,8 +38,8 @@ const Component = {
         backgroundColor: Colors.Background.Primary,
     },
     PageInnerContainer: {
-        flex: 1,
         padding: Spacing.Gap.Lg,
+        backgroundColor: Colors.Background.Primary,
     },
     Card: {
         backgroundColor: Colors.Background.Secondary,
