@@ -10,9 +10,15 @@ export default function RootLayout() {
         tabBarStyle: {
           backgroundColor: theme.Colors.Background.Menu,
           borderColor: theme.Colors.Border,
+          height: 60,
         },
         tabBarActiveTintColor: theme.Colors.Accent,
         tabBarInactiveTintColor: theme.Colors.Text.Secondary,
+        tabBarShowLabel: false,
+        tabBarIconStyle: {
+          marginTop: 8,
+          // TODO: Find a better way to center icons vertically
+        },
       }}
     >
       <Tabs.Screen
