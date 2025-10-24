@@ -1,6 +1,10 @@
+import PageHeader from "@/src/components/PageHeader";
+import ThemedButton from "@/src/components/ThemedButton";
+import theme from "@/src/theme/theme";
 import { User } from "firebase/auth";
 import React, { useEffect, useState } from "react";
-import { Alert, Button, Text, TextInput, View } from "react-native";
+import { Alert, Text, TextInput, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { onAuthStateChange, signInWithEmailPassword, signOutUser, signUpWithEmailPassword } from "../../../src/services/authService";
 
 export default function SettingsAccountScreen() {
@@ -51,13 +55,13 @@ export default function SettingsAccountScreen() {
     };
 
     return (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 20 }}>
-            <Text style={{ fontSize: 24, marginBottom: 20 }}>Account</Text>
+        <SafeAreaView style={theme.Component.PageContainer}>
+            <PageHeader title="Account" showBackButton />
             {user ? (
                 <View style={{ alignItems: "center" }}>
-                    <Text>Welcome, {user.displayName || user.email}!</Text>
-                    <Text>Email: {user.email}</Text>
-                    <Button title="Sign Out" onPress={handleSignOut} />
+                    <Text style={styles.text}>Welcome, {user.displayName || user.email}!</Text>
+                    <Text style={styles.text}>Email: {user.email}</Text>
+                    <ThemedButton title="Sign Out" onPress={handleSignOut} />
                 </View>
             ) : (
                 <View style={{ width: '100%', alignItems: 'center' }}>
@@ -77,13 +81,21 @@ export default function SettingsAccountScreen() {
                         secureTextEntry
                         autoCapitalize="none"
                     />
-                    <Button title={isSignUp ? "Sign Up" : "Sign In"} onPress={handleAuth} />
-                    <Button
+                    <ThemedButton title={isSignUp ? "Sign Up" : "Sign In"} onPress={handleAuth} />
+                    <ThemedButton
                         title={`Switch to ${isSignUp ? 'Sign In' : 'Sign Up'}`}
                         onPress={() => setIsSignUp(!isSignUp)}
                     />
                 </View>
             )}
-        </View>
+        </SafeAreaView>
     );
 }
+
+const styles = {
+    text: {
+        fontSize: 16,
+        marginBottom: 10,
+        color: theme.Colors.Text.Primary,
+    },
+};

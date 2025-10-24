@@ -5,5 +5,5 @@ export const unstable_settings = {
 };
 
 export default function SettingsLayout() {
-    return <Stack />;
+    return <Stack screenOptions={{ headerShown: false }} />;
 }

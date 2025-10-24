@@ -1,7 +1,8 @@
+import ThemedButton from '@/src/components/ThemedButton';
 import theme from '@/src/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
 import groupPositions from '../../mock/groupPositions.json';
 
@@ -112,10 +113,12 @@ function Index() {
         ))}
       </MapView>
       {/* Custom re-center button */}
-      <TouchableOpacity style={styles.customRecenterButton} onPress={centerOnUser}>
-        <Ionicons name="compass" size={22} color="#fff" />
-        <Text style={styles.recenterText}>Center on Me</Text>
-      </TouchableOpacity>
+      <ThemedButton
+        title="Center on Me"
+        onPress={centerOnUser}
+        style={styles.customRecenterButton}
+        prefix={<Ionicons name="compass" size={22} color="#fff" />}
+      />
     </View>
   );
 }

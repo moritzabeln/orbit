@@ -1,17 +1,21 @@
+import PageHeader from "@/src/components/PageHeader";
+import ThemedButton from "@/src/components/ThemedButton";
+import theme from "@/src/theme/theme";
 import { useRouter } from "expo-router";
-import { Text, TouchableOpacity, View } from "react-native";
+import { View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SettingsScreen() {
     const router = useRouter();
 
     return (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <Text>Settings</Text>
-            <TouchableOpacity onPress={() => {
-                router.navigate('/settings/account');
-            }}>
-                <Text>Account</Text>
-            </TouchableOpacity>
-        </View>
+        <SafeAreaView style={[theme.Component.PageContainer, { alignItems: "center" }]}>
+            <PageHeader title="Settings" />
+            <View style={theme.Component.PageInnerContainer}>
+                <ThemedButton title="Account" onPress={() => {
+                    router.navigate('/settings/account');
+                }} />
+            </View>
+        </SafeAreaView>
     );
 }
