@@ -3,12 +3,11 @@ import { Tabs } from "expo-router";
 
 export default function RootLayout() {
   return (
-    <Tabs>
+    <Tabs screenOptions={{ headerShown: false }}>
       <Tabs.Screen
         name="index"
         options={{
           title: "Home",
-          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
           ),
@@ -18,17 +17,9 @@ export default function RootLayout() {
         name="settings"
         options={{
           title: "Settings",
-          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings" size={size} color={color} />
           ),
-        }}
-      />
-      {/* Hidden */}
-      <Tabs.Screen
-        name="settings/account"
-        options={{
-          href: null,
         }}
       />
     </Tabs>

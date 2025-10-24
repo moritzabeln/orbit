@@ -1,59 +1,42 @@
-import * as Linking from 'expo-linking';
 import { User } from "firebase/auth";
 import React, { useEffect, useState } from "react";
 import { Alert, Button, Text, TextInput, View } from "react-native";
-import { auth, isSignInWithEmailLink, onAuthStateChange, sendSignInLink, signInWithEmailLinkAuth, signOutUser } from "../../src/services/authService";
+import { onAuthStateChange, signInWithEmailPassword, signOutUser, signUpWithEmailPassword } from "../../../src/services/authService";
 
 export default function SettingsAccountScreen() {
     const [user, setUser] = useState<User | null>(null);
     const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isSignUp, setIsSignUp] = useState(false);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChange((currentUser) => {
             setUser(currentUser);
         });
 
-        const handleUrl = async (url: string) => {
-            if (isSignInWithEmailLink(auth, url)) {
-                Alert.prompt('Enter your email', 'Enter the email you used to sign in', (inputEmail) => {
-                    if (inputEmail) {
-                        signInWithEmailLinkAuth(inputEmail, url)
-                            .then((signedInUser) => {
-                                setUser(signedInUser);
-                                Alert.alert("Success", "Signed in successfully!");
-                            })
-                            .catch((error) => {
-                                Alert.alert("Error", "Sign-in failed: " + (error as Error).message);
-                            });
-                    }
-                });
-            }
-        };
-
-        Linking.getInitialURL().then(url => {
-            if (url) handleUrl(url);
-        });
-
-        const subscription = Linking.addEventListener('url', (event) => {
-            handleUrl(event.url);
-        });
-
         return () => {
             unsubscribe();
-            subscription.remove();
         };
     }, []);
 
-    const handleSendSignInLink = async () => {
-        if (!email) {
-            Alert.alert('Error', 'Please enter your email');
+    const handleAuth = async () => {
+        if (!email || !password) {
+            Alert.alert('Error', 'Please enter both email and password');
             return;
         }
+
         try {
-            await sendSignInLink(email);
-            Alert.alert('Success', 'Sign-in link sent to your email');
+            let signedInUser: User;
+            if (isSignUp) {
+                signedInUser = await signUpWithEmailPassword(email, password);
+                Alert.alert("Success", "Account created successfully!");
+            } else {
+                signedInUser = await signInWithEmailPassword(email, password);
+                Alert.alert("Success", "Signed in successfully!");
+            }
+            setUser(signedInUser);
         } catch (error) {
-            Alert.alert('Error', 'Failed to send sign-in link: ' + (error as Error).message);
+            Alert.alert('Error', `${isSignUp ? 'Sign up' : 'Sign in'} failed: ` + (error as Error).message);
         }
     };
 
@@ -86,7 +69,19 @@ export default function SettingsAccountScreen() {
                         keyboardType="email-address"
                         autoCapitalize="none"
                     />
-                    <Button title="Send Sign-In Link" onPress={handleSendSignInLink} />
+                    <TextInput
+                        style={{ borderWidth: 1, borderColor: '#ccc', padding: 10, marginBottom: 10, width: '80%' }}
+                        placeholder="Enter your password"
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry
+                        autoCapitalize="none"
+                    />
+                    <Button title={isSignUp ? "Sign Up" : "Sign In"} onPress={handleAuth} />
+                    <Button
+                        title={`Switch to ${isSignUp ? 'Sign In' : 'Sign Up'}`}
+                        onPress={() => setIsSignUp(!isSignUp)}
+                    />
                 </View>
             )}
         </View>

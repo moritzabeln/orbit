@@ -1,7 +1,39 @@
-import { ActionCodeSettings, getAuth, isSignInWithEmailLink, onAuthStateChanged, sendSignInLinkToEmail, signInWithEmailLink, signOut, User } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+    createUserWithEmailAndPassword,
+    // @ts-ignore
+    getReactNativePersistence,
+    initializeAuth,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    signOut,
+    User
+} from 'firebase/auth';
 import app from './firebaseConfig';
 
-const auth = getAuth(app);
+const auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage)
+});
+
+export const signInWithEmailPassword = async (email: string, password: string): Promise<User> => {
+    try {
+        const result = await signInWithEmailAndPassword(auth, email, password);
+        return result.user;
+    } catch (error) {
+        console.error('Error signing in:', error);
+        throw error;
+    }
+};
+
+export const signUpWithEmailPassword = async (email: string, password: string): Promise<User> => {
+    try {
+        const result = await createUserWithEmailAndPassword(auth, email, password);
+        return result.user;
+    } catch (error) {
+        console.error('Error signing up:', error);
+        throw error;
+    }
+};
 
 export const signOutUser = async () => {
     try {
@@ -20,36 +52,4 @@ export const onAuthStateChange = (callback: (user: User | null) => void) => {
     return onAuthStateChanged(auth, callback);
 };
 
-export const sendSignInLink = async (email: string) => {
-    const actionCodeSettings: ActionCodeSettings = {
-        url: 'localhost',
-        android: {
-            packageName: 'com.mabeln.orbit',
-            installApp: true,
-            minimumVersion: '1',
-        },
-        handleCodeInApp: true,
-    };
-    try {
-        await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-    } catch (error) {
-        console.error('Error sending sign-in link:', error);
-        throw error;
-    }
-};
-
-export const signInWithEmailLinkAuth = async (email: string, emailLink: string): Promise<User> => {
-    try {
-        if (isSignInWithEmailLink(auth, emailLink)) {
-            const result = await signInWithEmailLink(auth, email, emailLink);
-            return result.user;
-        } else {
-            throw new Error('Invalid sign-in link');
-        }
-    } catch (error) {
-        console.error('Error signing in with email link:', error);
-        throw error;
-    }
-};
-
-export { auth, isSignInWithEmailLink };
+export { auth };
