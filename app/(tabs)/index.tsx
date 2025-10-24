@@ -1,9 +1,7 @@
-
-
 import theme from '@/src/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from "react";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
 import groupPositions from '../../mock/groupPositions.json';
 
@@ -16,16 +14,14 @@ const styles = StyleSheet.create({
   },
   profileMarkerContainer: {
     alignItems: 'center',
-    width: 100,
-    height: 100,
+    width: 30,
+    height: 30,
+    borderRadius: 20,
+    backgroundColor: '#222',
+    borderWidth: 1,
+    borderColor: '#ccc',
   },
   profileIconBlank: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#eee',
-    borderWidth: 2,
-    borderColor: '#ccc',
   },
   downArrow: {
     marginTop: -2,
@@ -100,15 +96,17 @@ function Index() {
             key={member.id}
             coordinate={{ latitude: member.latitude, longitude: member.longitude }}
             anchor={{ x: 0.5, y: 1 }}
-            tracksViewChanges={false}
-            image={require('../../assets/images/icon.png')}
+          // tracksViewChanges={true}
           >
             <View style={styles.profileMarkerContainer}>
-              <Image
+              {/* <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
+                {member.name}
+              </Text> */}
+              {/* <Image
                 source={{ uri: `../../assets/icon.png` }}
-              />
-              <View style={styles.profileIconBlank} />
-              <Ionicons name="caret-down" size={24} color={theme.Colors.Text} style={styles.downArrow} />
+              /> */}
+              {/*<View style={styles.profileIconBlank} />*/}
+              {/* <Ionicons name="caret-down" size={24} color={theme.Colors.Text} style={styles.downArrow} /> */}
             </View>
           </Marker>
         ))}
