@@ -5,6 +5,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
 import groupPositions from '../../mock/groupPositions.json';
+import { onAuthStateChange } from '../services/authService';
+import { getGroupPositions, getUserGroups, GroupMember } from '../services/databaseService';
 
 const styles = StyleSheet.create({
     container: {
@@ -68,6 +70,8 @@ function computeRegion(positions: Position[]) {
 function HomeScreen() {
     const mapRef = useRef<MapView>(null);
     const [region, setRegion] = useState<Region>();
+    const [user, setUser] = useState<any>(null);
+    const [allPositions, setAllPositions] = useState<{ [groupId: string]: { [userId: string]: GroupMember } }>({});
 
     const initialRegion = computeRegion(groupPositions);
 
@@ -76,10 +80,71 @@ function HomeScreen() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    useEffect(() => {
+        const unsubscribeAuth = onAuthStateChange((currentUser) => {
+            setUser(currentUser);
+        });
+
+        return () => {
+            unsubscribeAuth();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!user) {
+            setAllPositions({});
+            return;
+        }
+
+        const unsubscribeGroups = getUserGroups(user.uid, (userGroups) => {
+            // Set up position listeners for all groups
+            const positionUnsubscribers: (() => void)[] = [];
+
+            userGroups.forEach((group) => {
+                const unsubscribePositions = getGroupPositions(group.id, (positions) => {
+                    setAllPositions(prev => ({
+                        ...prev,
+                        [group.id]: positions
+                    }));
+                });
+                positionUnsubscribers.push(unsubscribePositions);
+            });
+
+            return () => {
+                positionUnsubscribers.forEach(unsubscribe => unsubscribe());
+            };
+        });
+
+        return () => {
+            unsubscribeGroups();
+        };
+    }, [user]);
+
     // Center map on current user (for now, initial region)
     const centerOnUser = () => {
         mapRef.current?.animateToRegion(initialRegion, 1000);
     };
+
+    // Get all positions from all groups
+    const getAllMemberPositions = () => {
+        const positions: { latitude: number; longitude: number; id: string }[] = [];
+
+        Object.values(allPositions).forEach((groupPositions) => {
+            Object.values(groupPositions).forEach((member) => {
+                if (member.latitude && member.longitude) {
+                    positions.push({
+                        latitude: member.latitude,
+                        longitude: member.longitude,
+                        id: member.id
+                    });
+                }
+            });
+        });
+
+        return positions;
+    };
+
+    const memberPositions = getAllMemberPositions();
 
     return (
         <View style={styles.container}>
@@ -92,22 +157,14 @@ function HomeScreen() {
                 onRegionChangeComplete={setRegion}
             >
                 {/* Show group members as profile icons with down arrows */}
-                {groupPositions.map((member) => (
+                {memberPositions.map((member) => (
                     <Marker
                         key={member.id}
                         coordinate={{ latitude: member.latitude, longitude: member.longitude }}
                         anchor={{ x: 0.5, y: 1 }}
-                    // tracksViewChanges={true}
                     >
                         <View style={styles.profileMarkerContainer}>
-                            {/* <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
-                {member.name}
-              </Text> */}
-                            {/* <Image
-                source={{ uri: `../../assets/icon.png` }}
-              /> */}
-                            {/*<View style={styles.profileIconBlank} />*/}
-                            {/* <Ionicons name="caret-down" size={24} color={theme.Colors.Text} style={styles.downArrow} /> */}
+                            {/* Custom marker content can be added here */}
                         </View>
                     </Marker>
                 ))}

@@ -1,8 +1,48 @@
 import theme from "@/src/theme/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import React, { useEffect } from "react";
+import { onAuthStateChange } from "../../src/services/authService";
+import { updatePositionInAllGroups } from "../../src/services/databaseService";
+import { watchLocation } from "../../src/services/locationService";
 
 export default function RootLayout() {
+  useEffect(() => {
+    let locationUnsubscribe: (() => void) | null = null;
+
+    const authUnsubscribe = onAuthStateChange((user) => {
+      if (user) {
+        // User is authenticated, start location tracking
+        locationUnsubscribe = watchLocation(
+          async (location) => {
+            try {
+              // Update position in all groups the user belongs to
+              await updatePositionInAllGroups(user.uid, location.latitude, location.longitude);
+            } catch (error) {
+              console.error('Error updating position in groups:', error);
+            }
+          },
+          (error) => {
+            console.error('Location tracking error:', error);
+          }
+        );
+      } else {
+        // User is not authenticated, stop location tracking
+        if (locationUnsubscribe) {
+          locationUnsubscribe();
+          locationUnsubscribe = null;
+        }
+      }
+    });
+
+    return () => {
+      authUnsubscribe();
+      if (locationUnsubscribe) {
+        locationUnsubscribe();
+      }
+    };
+  }, []);
+
   return (
     <Tabs
       screenOptions={{

@@ -1,4 +1,4 @@
-import { getDatabase, off, onValue, push, ref, set } from 'firebase/database';
+import { get, getDatabase, off, onValue, push, ref, set } from 'firebase/database';
 import { getCurrentUser } from './authService';
 import app from './firebaseConfig';
 
@@ -74,6 +74,29 @@ export const updateMemberPosition = async (groupId: string, userId: string, lati
         longitude,
         lastUpdated: Date.now()
     });
+};
+
+export const updatePositionInAllGroups = async (userId: string, latitude: number, longitude: number) => {
+    // First get all groups the user is in
+    const groupsRef = ref(database, 'groups');
+    const snapshot = await get(groupsRef);
+
+    const updatePromises: Promise<void>[] = [];
+
+    snapshot.forEach((childSnapshot: any) => {
+        const group = childSnapshot.val() as Omit<Group, 'id'>;
+        if (group.members && group.members[userId]) {
+            // User is a member of this group, update their position
+            const positionRef = ref(database, `groups/${childSnapshot.key}/positions/${userId}`);
+            updatePromises.push(set(positionRef, {
+                latitude,
+                longitude,
+                lastUpdated: Date.now()
+            }));
+        }
+    });
+
+    await Promise.all(updatePromises);
 };
 
 export const getGroupPositions = (groupId: string, callback: (positions: { [userId: string]: GroupMember }) => void) => {
