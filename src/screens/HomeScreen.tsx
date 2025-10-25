@@ -143,6 +143,10 @@ function HomeScreen() {
     const onRegionChanged = (newRegion: Region) => {
     };
 
+    const onMapReady = () => {
+        // mapRef.current?.render();
+    };
+
     return (
         <View style={styles.container}>
             <MapView
@@ -151,6 +155,7 @@ function HomeScreen() {
                 style={styles.map}
                 initialRegion={initialRegion}
                 onRegionChangeComplete={onRegionChanged}
+                onMapReady={onMapReady}
             >
                 {/* Show group members as profile icons with down arrows */}
                 {memberPositions.map((member) => (
@@ -158,10 +163,8 @@ function HomeScreen() {
                         key={member.id}
                         coordinate={{ latitude: member.latitude, longitude: member.longitude }}
                         anchor={{ x: 0.5, y: 1 }}
-                        tracksViewChanges={false}
                     >
                         <View style={styles.profileMarkerContainer}>
-                            {/* Custom marker content can be added here */}
                         </View>
                     </Marker>
                 ))}
@@ -185,12 +188,14 @@ const styles = StyleSheet.create({
     },
     map: {
         flex: 1,
+        width: '100%',
+        height: '100%',
     },
     profileMarkerContainer: {
         alignItems: 'center',
-        width: 30,
-        height: 30,
-        borderRadius: 20,
+        width: 50,
+        height: 50,
+        borderRadius: 25,
         backgroundColor: '#222',
         borderWidth: 1,
         borderColor: '#ccc',
