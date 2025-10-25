@@ -50,7 +50,6 @@ export default function RootLayout() {
         tabBarStyle: {
           backgroundColor: theme.Colors.Background.Menu,
           borderColor: theme.Colors.Border,
-          height: 60,
         },
         tabBarActiveTintColor: theme.Colors.Accent,
         tabBarInactiveTintColor: theme.Colors.Text.Secondary,
@@ -66,7 +65,7 @@ export default function RootLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ color }) => (
-            <Ionicons name="home" size={20} color={color} />
+            <Ionicons name="home" size={24} color={color} />
           ),
         }}
       />
@@ -75,7 +74,7 @@ export default function RootLayout() {
         options={{
           title: "Settings",
           tabBarIcon: ({ color }) => (
-            <Ionicons name="settings" size={20} color={color} />
+            <Ionicons name="settings" size={24} color={color} />
           ),
         }}
       />
