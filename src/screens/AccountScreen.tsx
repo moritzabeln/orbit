@@ -1,27 +1,98 @@
 import PageHeader from "@/src/components/PageHeader";
 import ThemedButton from "@/src/components/ThemedButton";
 import theme from "@/src/theme/theme";
+import * as ImagePicker from 'expo-image-picker';
 import { User } from "firebase/auth";
 import React, { useEffect, useState } from "react";
-import { Alert, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { onAuthStateChange, signInWithEmailPassword, signOutUser, signUpWithEmailPassword } from "../services/authService";
+import { getUserProfile, updateUserProfile } from "../services/databaseService";
+import { uploadProfilePicture } from "../services/storageService";
 
 export default function AccountScreen() {
     const [user, setUser] = useState<User | null>(null);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isSignUp, setIsSignUp] = useState(false);
+    const [profilePictureURL, setProfilePictureURL] = useState<string | null>(null);
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChange((currentUser) => {
             setUser(currentUser);
+
+            // Load profile picture when user is logged in
+            if (currentUser) {
+                loadUserProfile(currentUser.uid);
+            } else {
+                setProfilePictureURL(null);
+            }
         });
 
         return () => {
             unsubscribe();
         };
     }, []);
+
+    const loadUserProfile = async (userId: string) => {
+        try {
+            const profile = await getUserProfile(userId);
+            if (profile?.profilePictureURL) {
+                setProfilePictureURL(profile.profilePictureURL);
+            }
+        } catch (error) {
+            console.error('Error loading profile:', error);
+        }
+    };
+
+    const pickImage = async () => {
+        if (!user) return;
+
+        // Request permissions
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (status !== 'granted') {
+            Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to select a profile picture.');
+            return;
+        }
+
+        // Launch image picker
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: 'images',
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.5, // Compress to reduce upload size
+        });
+
+        if (!result.canceled && result.assets[0]) {
+            await uploadImage(result.assets[0].uri);
+        }
+    };
+
+    const uploadImage = async (uri: string) => {
+        if (!user) return;
+
+        setIsUploadingImage(true);
+        try {
+            // Upload to Firebase Storage
+            const downloadURL = await uploadProfilePicture(user.uid, uri);
+
+            // Update user profile in database
+            await updateUserProfile(user.uid, {
+                userId: user.uid,
+                profilePictureURL: downloadURL,
+            });
+
+            setProfilePictureURL(downloadURL);
+            Alert.alert('Success', 'Profile picture updated successfully!');
+        } catch (error) {
+            Alert.alert('Error', 'Failed to upload profile picture: ' + (error as Error).message);
+            console.error('Error uploading image:', error);
+        } finally {
+            setIsUploadingImage(false);
+        }
+    };
 
     const handleAuth = async () => {
         if (!email || !password) {
@@ -58,7 +129,27 @@ export default function AccountScreen() {
         <SafeAreaView style={theme.Component.PageContainer}>
             <PageHeader title="Account" showBackButton />
             {user ? (
-                <View style={{ alignItems: "center" }}>
+                <View style={styles.container}>
+                    <TouchableOpacity onPress={pickImage} disabled={isUploadingImage}>
+                        <View style={styles.profilePictureContainer}>
+                            {isUploadingImage ? (
+                                <View style={styles.profilePicture}>
+                                    <ActivityIndicator size="large" color={theme.Colors.Accent} />
+                                </View>
+                            ) : profilePictureURL ? (
+                                <Image source={{ uri: profilePictureURL }} style={styles.profilePicture} />
+                            ) : (
+                                <View style={styles.profilePicturePlaceholder}>
+                                    <Text style={styles.placeholderText}>
+                                        {user.displayName?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || '?'}
+                                    </Text>
+                                </View>
+                            )}
+                            <View style={styles.editBadge}>
+                                <Text style={styles.editBadgeText}>✏️</Text>
+                            </View>
+                        </View>
+                    </TouchableOpacity>
                     <Text style={styles.text}>Welcome, {user.displayName || user.email}!</Text>
                     <Text style={styles.text}>Email: {user.email}</Text>
                     <ThemedButton title="Sign Out" onPress={handleSignOut} />
@@ -92,10 +183,55 @@ export default function AccountScreen() {
     );
 }
 
-const styles = {
+const styles = StyleSheet.create({
+    container: {
+        alignItems: 'center',
+        padding: 20,
+    },
+    profilePictureContainer: {
+        position: 'relative',
+        marginBottom: 20,
+    },
+    profilePicture: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        backgroundColor: theme.Colors.Background.Secondary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    profilePicturePlaceholder: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        backgroundColor: theme.Colors.Accent,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    placeholderText: {
+        fontSize: 48,
+        color: theme.Colors.TextOnAccent,
+        fontWeight: 'bold',
+    },
+    editBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        backgroundColor: theme.Colors.Accent,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: theme.Colors.Background.Primary,
+    },
+    editBadgeText: {
+        fontSize: 18,
+    },
     text: {
         fontSize: 16,
         marginBottom: 10,
         color: theme.Colors.Text.Primary,
     },
-};
+});

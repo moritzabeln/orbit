@@ -18,6 +18,13 @@ export interface GroupMember {
     latitude?: number;
     longitude?: number;
     lastUpdated?: number;
+    profilePictureURL?: string;
+}
+
+export interface UserProfile {
+    userId: string;
+    displayName?: string;
+    profilePictureURL?: string;
 }
 
 export const createGroup = async (name: string): Promise<string> => {
@@ -68,11 +75,15 @@ export const addGroupMember = async (groupId: string, userId: string) => {
 };
 
 export const updateMemberPosition = async (groupId: string, userId: string, latitude: number, longitude: number) => {
+    // Get user profile to include profile picture URL
+    const profile = await getUserProfile(userId);
+
     const positionRef = ref(database, `groups/${groupId}/positions/${userId}`);
     await set(positionRef, {
         latitude,
         longitude,
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
+        profilePictureURL: profile?.profilePictureURL || null,
     });
 };
 
@@ -80,6 +91,9 @@ export const updatePositionInAllGroups = async (userId: string, latitude: number
     // First get all groups the user is in
     const groupsRef = ref(database, 'groups');
     const snapshot = await get(groupsRef);
+
+    // Get user profile to include profile picture URL
+    const profile = await getUserProfile(userId);
 
     const updatePromises: Promise<void>[] = [];
 
@@ -91,7 +105,8 @@ export const updatePositionInAllGroups = async (userId: string, latitude: number
             updatePromises.push(set(positionRef, {
                 latitude,
                 longitude,
-                lastUpdated: Date.now()
+                lastUpdated: Date.now(),
+                profilePictureURL: profile?.profilePictureURL || null,
             }));
         }
     });
@@ -114,4 +129,36 @@ export const getGroupPositions = (groupId: string, callback: (positions: { [user
     });
 
     return () => off(positionsRef, 'value', listener);
+};
+
+export const updateUserProfile = async (userId: string, profileData: Partial<UserProfile>) => {
+    const userRef = ref(database, `users/${userId}/profile`);
+    await set(userRef, {
+        ...profileData,
+        userId,
+        lastUpdated: Date.now()
+    });
+};
+
+export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
+    const userRef = ref(database, `users/${userId}/profile`);
+    const snapshot = await get(userRef);
+    if (snapshot.exists()) {
+        return snapshot.val() as UserProfile;
+    }
+    return null;
+};
+
+export const watchUserProfile = (userId: string, callback: (profile: UserProfile | null) => void) => {
+    const userRef = ref(database, `users/${userId}/profile`);
+
+    const listener = onValue(userRef, (snapshot) => {
+        if (snapshot.exists()) {
+            callback(snapshot.val() as UserProfile);
+        } else {
+            callback(null);
+        }
+    });
+
+    return () => off(userRef, 'value', listener);
 };

@@ -3,7 +3,7 @@ import theme from '@/src/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { User } from 'firebase/auth';
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
 import { onAuthStateChange } from '../services/authService';
 import { getGroupPositions, getUserGroups, GroupMember } from '../services/databaseService';
@@ -12,6 +12,7 @@ interface MemberPosition {
     latitude: number;
     longitude: number;
     id: string;
+    profilePictureURL?: string;
 }
 
 type Position = { latitude: number; longitude: number };
@@ -103,7 +104,8 @@ function HomeScreen() {
                     positions.push({
                         latitude: member.latitude,
                         longitude: member.longitude,
-                        id: member.id
+                        id: member.id,
+                        profilePictureURL: member.profilePictureURL
                     });
                 }
             });
@@ -165,6 +167,16 @@ function HomeScreen() {
                         anchor={{ x: 0.5, y: 1 }}
                     >
                         <View style={styles.profileMarkerContainer}>
+                            {member.profilePictureURL ? (
+                                <Image
+                                    source={{ uri: member.profilePictureURL }}
+                                    style={styles.profileImage}
+                                />
+                            ) : (
+                                <View style={styles.profilePlaceholder}>
+                                    <Ionicons name="person" size={24} color="#fff" />
+                                </View>
+                            )}
                         </View>
                     </Marker>
                 ))}
@@ -193,12 +205,27 @@ const styles = StyleSheet.create({
     },
     profileMarkerContainer: {
         alignItems: 'center',
+        justifyContent: 'center',
         width: 50,
         height: 50,
         borderRadius: 25,
-        backgroundColor: '#222',
-        borderWidth: 1,
-        borderColor: '#ccc',
+        backgroundColor: theme.Colors.Accent,
+        borderWidth: 3,
+        borderColor: '#fff',
+        overflow: 'hidden',
+    },
+    profileImage: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+    },
+    profilePlaceholder: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: theme.Colors.Accent,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     customRecenterButton: {
         position: 'absolute',
