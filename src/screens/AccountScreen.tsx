@@ -7,8 +7,7 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { onAuthStateChange, signInWithEmailPassword, signOutUser, signUpWithEmailPassword } from "../services/authService";
-import { getUserProfile, updateUserProfile } from "../services/databaseService";
-import { uploadProfilePicture } from "../services/storageService";
+import { getProfilePictureURL, uploadProfilePicture } from "../services/storageService";
 
 export default function AccountScreen() {
     const [user, setUser] = useState<User | null>(null);
@@ -19,14 +18,18 @@ export default function AccountScreen() {
     const [isUploadingImage, setIsUploadingImage] = useState(false);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChange((currentUser) => {
+        const unsubscribe = onAuthStateChange(async (currentUser) => {
             setUser(currentUser);
+            console.log(`Auth state changed. Current user is now: ${currentUser ? currentUser.email : 'null'} UID: ${currentUser ? currentUser.uid : 'N/A'}`);
 
-            // Load profile picture when user is logged in
-            if (currentUser) {
-                loadUserProfile(currentUser.uid);
-            } else {
+            if (!currentUser) {
                 setProfilePictureURL(null);
+            } else {
+                await getProfilePictureURL(currentUser.uid).then((url) => {
+                    setProfilePictureURL(url);
+                }).catch((error) => {
+                    console.error('Error fetching profile picture URL:', error);
+                });
             }
         });
 
@@ -34,17 +37,6 @@ export default function AccountScreen() {
             unsubscribe();
         };
     }, []);
-
-    const loadUserProfile = async (userId: string) => {
-        try {
-            const profile = await getUserProfile(userId);
-            if (profile?.profilePictureURL) {
-                setProfilePictureURL(profile.profilePictureURL);
-            }
-        } catch (error) {
-            console.error('Error loading profile:', error);
-        }
-    };
 
     const pickImage = async () => {
         if (!user) return;
@@ -75,20 +67,17 @@ export default function AccountScreen() {
 
         setIsUploadingImage(true);
         try {
-            // Upload to Firebase Storage
-            const downloadURL = await uploadProfilePicture(user.uid, uri);
+            // Upload to the API
+            await uploadProfilePicture(user.uid, uri);
 
-            // Update user profile in database
-            await updateUserProfile(user.uid, {
-                userId: user.uid,
-                profilePictureURL: downloadURL,
-            });
+            // Fetch the new profile picture (cache was cleared by upload)
+            const newURL = await getProfilePictureURL(user.uid);
+            setProfilePictureURL(newURL);
 
-            setProfilePictureURL(downloadURL);
             Alert.alert('Success', 'Profile picture updated successfully!');
         } catch (error) {
             Alert.alert('Error', 'Failed to upload profile picture: ' + (error as Error).message);
-            console.error('Error uploading image:', error);
+            console.log('Error uploading image:', error);
         } finally {
             setIsUploadingImage(false);
         }
