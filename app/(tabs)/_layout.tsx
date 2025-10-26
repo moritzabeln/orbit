@@ -3,7 +3,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React, { useEffect } from "react";
 import { onAuthStateChange } from "../../src/services/authService";
-import { updatePositionInAllGroups } from "../../src/services/databaseService";
+import { getBatteryInfo } from "../../src/services/batteryService";
+import { updatePositionInAllGroups, updateUserBattery } from "../../src/services/databaseService";
 import { watchLocation } from "../../src/services/locationService";
 
 export default function RootLayout() {
@@ -18,8 +19,15 @@ export default function RootLayout() {
             try {
               // Update position in all groups the user belongs to
               await updatePositionInAllGroups(user.uid, location.latitude, location.longitude);
+
+              // Also update battery info alongside location
+              const batteryInfo = await getBatteryInfo();
+              if (batteryInfo.level >= 0) {
+                await updateUserBattery(user.uid, batteryInfo.level, batteryInfo.state);
+                console.log(`Location & Battery updated: ${batteryInfo.level}%, charging: ${batteryInfo.isCharging}`);
+              }
             } catch (error) {
-              console.error('Error updating position in groups:', error);
+              console.error('Error updating position/battery:', error);
             }
           },
           (error) => {
@@ -27,7 +35,7 @@ export default function RootLayout() {
           }
         );
       } else {
-        // User is not authenticated, stop location tracking
+        // User is not authenticated, stop tracking
         if (locationUnsubscribe) {
           locationUnsubscribe();
           locationUnsubscribe = null;

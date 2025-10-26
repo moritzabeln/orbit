@@ -16,6 +16,9 @@ export interface UserProfile {
     displayName?: string;
     email?: string;
     photoURL?: string;
+    batteryLevel?: number; // Battery percentage (0-100)
+    batteryState?: number; // Battery state (1=UNKNOWN, 2=UNPLUGGED, 3=CHARGING, 4=FULL)
+    batteryLastUpdated?: number; // Timestamp of last battery update
     createdAt?: number;
     updatedAt?: number;
 }

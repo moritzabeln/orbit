@@ -84,6 +84,8 @@ export default function SettingsScreen() {
                         key={member.userId}
                         userId={member.userId}
                         name={member.profile.displayName}
+                        batteryLevel={member.profile.batteryLevel}
+                        batteryState={member.profile.batteryState}
                     />
                 ))}
             </View>

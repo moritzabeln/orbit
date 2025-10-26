@@ -196,3 +196,28 @@ export const getUserProfile = (userId: string, callback: (profile: UserProfile |
 
     return () => off(profileRef, 'value', listener);
 };
+
+/**
+ * Update user's battery level in the database
+ * @param userId - The user ID
+ * @param batteryLevel - Battery percentage (0-100)
+ * @param batteryState - Battery state (optional)
+ */
+export const updateUserBattery = async (userId: string, batteryLevel: number, batteryState?: number) => {
+    const profileRef = ref(database, `users/${userId}/profile`);
+
+    // Get current profile data
+    const snapshot = await get(profileRef);
+    const currentProfile = snapshot.val() as UserProfile || {};
+
+    // Update battery info
+    const updatedProfile: UserProfile = {
+        ...currentProfile,
+        batteryLevel,
+        batteryState,
+        batteryLastUpdated: Date.now(),
+        updatedAt: Date.now()
+    };
+
+    await set(profileRef, updatedProfile);
+};
