@@ -1,18 +1,16 @@
+import ProfilePicture from '@/src/components/ProfilePicture';
 import ThemedButton from '@/src/components/ThemedButton';
 import theme from '@/src/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { User } from 'firebase/auth';
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Image, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
 import { onAuthStateChange } from '../services/authService';
-import { getGroupPositions, getUserGroups, GroupMember } from '../services/databaseService';
+import { getGroupPositions, getUserGroups, MemberPosition } from '../services/databaseService';
 
-interface MemberPosition {
-    latitude: number;
-    longitude: number;
-    id: string;
-    profilePictureURL?: string;
+interface MemberPositionWithId extends MemberPosition {
+    userId: string;
 }
 
 type Position = { latitude: number; longitude: number };
@@ -51,7 +49,7 @@ function HomeScreen() {
         longitudeDelta: 0.1
     }));
     const [user, setUser] = useState<User | null>(null);
-    const [allPositions, setAllPositions] = useState<{ [groupId: string]: { [userId: string]: GroupMember } }>({});
+    const [allPositions, setAllPositions] = useState<{ [groupId: string]: { [userId: string]: MemberPosition } }>({});
 
     // Auth state listener
     useEffect(() => {
@@ -96,16 +94,16 @@ function HomeScreen() {
 
     // Get all positions from all groups (memoized)
     const memberPositions = useMemo(() => {
-        const positions: MemberPosition[] = [];
+        const positions: MemberPositionWithId[] = [];
 
-        Object.values(allPositions).forEach((groupPositions) => {
-            Object.values(groupPositions).forEach((member) => {
-                if (member.latitude && member.longitude) {
+        Object.entries(allPositions).forEach(([, groupPositions]) => {
+            Object.entries(groupPositions).forEach(([userId, position]) => {
+                if (position.latitude && position.longitude) {
                     positions.push({
-                        latitude: member.latitude,
-                        longitude: member.longitude,
-                        id: member.id,
-                        profilePictureURL: member.profilePictureURL
+                        userId: userId,
+                        latitude: position.latitude,
+                        longitude: position.longitude,
+                        lastUpdated: position.lastUpdated
                     });
                 }
             });
@@ -159,25 +157,20 @@ function HomeScreen() {
                 onRegionChangeComplete={onRegionChanged}
                 onMapReady={onMapReady}
             >
-                {/* Show group members as profile icons with down arrows */}
+                {/* Show group members as profile icons */}
                 {memberPositions.map((member) => (
                     <Marker
-                        key={member.id}
+                        key={member.userId}
                         coordinate={{ latitude: member.latitude, longitude: member.longitude }}
-                        anchor={{ x: 0.5, y: 1 }}
+                        anchor={{ x: 0.5, y: 0.5 }}
                     >
-                        <View style={styles.profileMarkerContainer}>
-                            {member.profilePictureURL ? (
-                                <Image
-                                    source={{ uri: member.profilePictureURL, cache: 'reload' }}
-                                    style={styles.profileImage}
-                                />
-                            ) : (
-                                <View style={styles.profilePlaceholder}>
-                                    <Ionicons name="person" size={24} color="#fff" />
-                                </View>
-                            )}
-                        </View>
+                        <ProfilePicture
+                            userId={member.userId}
+                            size={50}
+                            showBorder={true}
+                            borderColor="#fff"
+                            borderWidth={3}
+                        />
                     </Marker>
                 ))}
             </MapView>
@@ -202,30 +195,6 @@ const styles = StyleSheet.create({
         flex: 1,
         width: '100%',
         height: '100%',
-    },
-    profileMarkerContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: theme.Colors.Accent,
-        borderWidth: 3,
-        borderColor: '#fff',
-        overflow: 'hidden',
-    },
-    profileImage: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-    },
-    profilePlaceholder: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: theme.Colors.Accent,
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     customRecenterButton: {
         position: 'absolute',

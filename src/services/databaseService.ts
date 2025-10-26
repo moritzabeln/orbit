@@ -1,31 +1,12 @@
 import { get, getDatabase, off, onValue, push, ref, set } from 'firebase/database';
+import { Group, MemberPosition, UserProfile, UserWithProfile } from '../models/database';
 import { getCurrentUser } from './authService';
 import app from './firebaseConfig';
 
 const database = getDatabase(app);
 
-export interface Group {
-    id: string;
-    name: string;
-    createdBy: string;
-    createdAt: number;
-    members: { [userId: string]: boolean };
-}
-
-export interface GroupMember {
-    id: string;
-    name: string;
-    latitude?: number;
-    longitude?: number;
-    lastUpdated?: number;
-    profilePictureURL?: string;
-}
-
-export interface UserProfile {
-    userId: string;
-    displayName?: string;
-    profilePictureURL?: string;
-}
+// Re-export models for backward compatibility
+export type { Group, MemberPosition, UserProfile, UserWithProfile };
 
 export const createGroup = async (name: string): Promise<string> => {
     const user = getCurrentUser();
@@ -106,19 +87,73 @@ export const updatePositionInAllGroups = async (userId: string, latitude: number
     await Promise.all(updatePromises);
 };
 
-export const getGroupPositions = (groupId: string, callback: (positions: { [userId: string]: GroupMember }) => void) => {
+export const getGroupPositions = (groupId: string, callback: (positions: { [userId: string]: MemberPosition }) => void) => {
     const positionsRef = ref(database, `groups/${groupId}/positions`);
 
     const listener = onValue(positionsRef, (snapshot) => {
-        const positions: { [userId: string]: GroupMember } = {};
+        const positions: { [userId: string]: MemberPosition } = {};
         snapshot.forEach((childSnapshot) => {
+            const positionData = childSnapshot.val();
             positions[childSnapshot.key!] = {
-                id: childSnapshot.key!,
-                ...childSnapshot.val()
+                latitude: positionData.latitude,
+                longitude: positionData.longitude,
+                lastUpdated: positionData.lastUpdated
             };
         });
         callback(positions);
     });
 
     return () => off(positionsRef, 'value', listener);
+};
+
+/**
+ * Get all members in a group (returns member IDs and basic profile info)
+ * This is more appropriate than getGroupPositions when you just need to display members
+ * @param groupId - The group ID
+ * @param callback - Callback function that receives the array of group members
+ * @returns Unsubscribe function
+ */
+export const getGroupMembers = (groupId: string, callback: (members: UserWithProfile[]) => void) => {
+    const groupRef = ref(database, `groups/${groupId}`);
+
+    const listener = onValue(groupRef, async (snapshot) => {
+        const groupData = snapshot.val();
+
+        if (!groupData || !groupData.members) {
+            callback([]);
+            return;
+        }
+
+        const userIds = Object.keys(groupData.members);
+        const members: UserWithProfile[] = [];
+
+        // Fetch user profiles for each member
+        for (const userId of userIds) {
+            const userProfileRef = ref(database, `users/${userId}/profile`);
+            try {
+                const userSnapshot = await get(userProfileRef);
+                const userProfile = userSnapshot.val() as UserProfile | null;
+
+                members.push({
+                    userId: userId,
+                    profile: userProfile || {
+                        displayName: 'Unknown User'
+                    }
+                });
+            } catch (error) {
+                console.error(`Error fetching user profile for ${userId}:`, error);
+                // Still add the user with just their ID
+                members.push({
+                    userId: userId,
+                    profile: {
+                        displayName: 'Unknown User'
+                    }
+                });
+            }
+        }
+
+        callback(members);
+    });
+
+    return () => off(groupRef, 'value', listener);
 };
