@@ -126,7 +126,7 @@ export default function AccountScreen() {
                                     <ActivityIndicator size="large" color={theme.Colors.Accent} />
                                 </View>
                             ) : profilePictureURL ? (
-                                <Image source={{ uri: profilePictureURL }} style={styles.profilePicture} />
+                                <Image source={{ uri: profilePictureURL, cache: 'reload' }} style={styles.profilePicture} />
                             ) : (
                                 <View style={styles.profilePicturePlaceholder}>
                                     <Text style={styles.placeholderText}>

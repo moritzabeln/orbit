@@ -169,7 +169,7 @@ function HomeScreen() {
                         <View style={styles.profileMarkerContainer}>
                             {member.profilePictureURL ? (
                                 <Image
-                                    source={{ uri: member.profilePictureURL }}
+                                    source={{ uri: member.profilePictureURL, cache: 'reload' }}
                                     style={styles.profileImage}
                                 />
                             ) : (

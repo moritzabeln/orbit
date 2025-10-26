@@ -124,13 +124,16 @@ export const getProfilePictureURL = async (
     // Check for cached file
     const cachedFile = new File(profilePicturesDir, `${userId}_profile_picture.jpg`);
 
+    // For testing force refresh
+    // forceRefresh = true;
+
     if (cachedFile.exists && !forceRefresh) {
         // Return file URI directly - binary image can be loaded by Image component
         return cachedFile.uri;
     }
 
     if (forceRefresh && cachedFile.exists) {
-        await cachedFile.delete();
+        cachedFile.delete();
     }
 
     const filename = 'profile_picture';
@@ -146,11 +149,15 @@ export const getProfilePictureURL = async (
         throw new Error(`Network request failed: ${fetchError.message}`);
     });
 
-    if (response.status === 404) {
-        return null;
-    }
-
     if (response.status !== 200) {
+        console.log(`Failed to fetch profile picture: HTTP ${response.status}`);
+        console.log(`URL: ${url}`);
+        try {
+            const errorText = await response.text();
+            console.error(`Response body: ${errorText.substring(0, 500)}`);
+        } catch {
+            console.error('Could not read error response body');
+        }
         return null;
     }
 
@@ -174,8 +181,7 @@ export const getProfilePictureURL = async (
         reader.readAsArrayBuffer(blob);
     });
 
-    await cachedFile.write(new Uint8Array(arrayBuffer));
+    cachedFile.write(new Uint8Array(arrayBuffer));
 
-    // Return the file URI - React Native Image component can load binary files directly
     return cachedFile.uri;
 };
