@@ -19,7 +19,7 @@ const GroupMemberCard: React.FC<GroupMemberCardProps> = ({
     batteryState,
     style,
 }) => {
-    const isCharging = batteryState === 3 || batteryState === 4; // CHARGING or FULL
+    const isCharging = batteryState === 2; // CHARGING or FULL
 
     const getBatteryColor = (level?: number): string => {
         if (level === undefined || level < 0) return theme.Colors.Text.Secondary;
