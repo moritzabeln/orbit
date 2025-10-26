@@ -157,3 +157,42 @@ export const getGroupMembers = (groupId: string, callback: (members: UserWithPro
 
     return () => off(groupRef, 'value', listener);
 };
+
+/**
+ * Update user profile in the database
+ * @param userId - The user ID
+ * @param profileData - The profile data to update
+ */
+export const updateUserProfile = async (userId: string, profileData: Partial<UserProfile>) => {
+    const profileRef = ref(database, `users/${userId}/profile`);
+
+    // Get current profile data
+    const snapshot = await get(profileRef);
+    const currentProfile = snapshot.val() as UserProfile || {};
+
+    // Merge with new data and update timestamp
+    const updatedProfile: UserProfile = {
+        ...currentProfile,
+        ...profileData,
+        updatedAt: Date.now()
+    };
+
+    await set(profileRef, updatedProfile);
+};
+
+/**
+ * Get user profile from the database
+ * @param userId - The user ID
+ * @param callback - Callback function that receives the user profile
+ * @returns Unsubscribe function
+ */
+export const getUserProfile = (userId: string, callback: (profile: UserProfile | null) => void) => {
+    const profileRef = ref(database, `users/${userId}/profile`);
+
+    const listener = onValue(profileRef, (snapshot) => {
+        const profile = snapshot.val() as UserProfile | null;
+        callback(profile);
+    });
+
+    return () => off(profileRef, 'value', listener);
+};

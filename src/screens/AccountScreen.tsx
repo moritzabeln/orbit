@@ -7,6 +7,7 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { onAuthStateChange, signInWithEmailPassword, signOutUser, signUpWithEmailPassword } from "../services/authService";
+import { getUserProfile, updateUserProfile, UserProfile } from "../services/databaseService";
 import { getProfilePictureURL, uploadProfilePicture } from "../services/storageService";
 
 export default function AccountScreen() {
@@ -16,6 +17,9 @@ export default function AccountScreen() {
     const [isSignUp, setIsSignUp] = useState(false);
     const [profilePictureURL, setProfilePictureURL] = useState<string | null>(null);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const [displayName, setDisplayName] = useState('');
+    const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChange(async (currentUser) => {
@@ -24,6 +28,8 @@ export default function AccountScreen() {
 
             if (!currentUser) {
                 setProfilePictureURL(null);
+                setUserProfile(null);
+                setDisplayName('');
             } else {
                 await getProfilePictureURL(currentUser.uid).then((url) => {
                     setProfilePictureURL(url);
@@ -37,6 +43,20 @@ export default function AccountScreen() {
             unsubscribe();
         };
     }, []);
+
+    // Subscribe to user profile changes
+    useEffect(() => {
+        if (!user) return;
+
+        const unsubscribe = getUserProfile(user.uid, (profile) => {
+            setUserProfile(profile);
+            setDisplayName(profile?.displayName || '');
+        });
+
+        return () => {
+            unsubscribe();
+        };
+    }, [user]);
 
     const pickImage = async () => {
         if (!user) return;
@@ -114,11 +134,32 @@ export default function AccountScreen() {
         }
     };
 
+    const handleSaveDisplayName = async () => {
+        if (!user) return;
+
+        try {
+            await updateUserProfile(user.uid, {
+                displayName: displayName.trim() || undefined,
+                email: user.email || undefined,
+            });
+            setIsEditingDisplayName(false);
+            Alert.alert("Success", "Display name updated successfully!");
+        } catch (error) {
+            Alert.alert("Error", "Failed to update display name: " + (error as Error).message);
+        }
+    };
+
+    const handleCancelEditDisplayName = () => {
+        setDisplayName(userProfile?.displayName || '');
+        setIsEditingDisplayName(false);
+    };
+
     return (
         <SafeAreaView style={theme.Component.PageContainer}>
             <PageHeader title="Account" showBackButton />
             {user ? (
                 <View style={styles.container}>
+                    {/* Profile Picture */}
                     <TouchableOpacity onPress={pickImage} disabled={isUploadingImage}>
                         <View style={styles.profilePictureContainer}>
                             {isUploadingImage ? (
@@ -130,7 +171,7 @@ export default function AccountScreen() {
                             ) : (
                                 <View style={styles.profilePicturePlaceholder}>
                                     <Text style={styles.placeholderText}>
-                                        {user.displayName?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || '?'}
+                                        {displayName?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || '?'}
                                     </Text>
                                 </View>
                             )}
@@ -139,9 +180,51 @@ export default function AccountScreen() {
                             </View>
                         </View>
                     </TouchableOpacity>
-                    <Text style={styles.text}>Welcome, {user.displayName || user.email}!</Text>
-                    <Text style={styles.text}>Email: {user.email}</Text>
-                    <ThemedButton title="Sign Out" onPress={handleSignOut} />
+
+                    {/* Display Name Card */}
+                    <View style={styles.infoCard}>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Name</Text>
+                            {isEditingDisplayName ? (
+                                <View style={styles.buttonRow}>
+                                    <TouchableOpacity onPress={handleCancelEditDisplayName}>
+                                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={handleSaveDisplayName}>
+                                        <Text style={styles.saveButtonText}>Save</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <TouchableOpacity onPress={() => setIsEditingDisplayName(true)}>
+                                    <Text style={styles.editButton}>Edit</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        {isEditingDisplayName ? (
+                            <TextInput
+                                style={styles.input}
+                                value={displayName}
+                                onChangeText={setDisplayName}
+                                placeholder="Enter your display name"
+                                placeholderTextColor={theme.Colors.Text.Secondary}
+                                autoFocus
+                            />
+                        ) : (
+                            <Text style={styles.infoValue}>
+                                {displayName || 'Not set'}
+                            </Text>
+                        )}
+                    </View>
+
+                    {/* Email Card */}
+                    <View style={styles.infoCard}>
+                        <Text style={styles.infoLabel}>Email</Text>
+                        <Text style={styles.infoValue}>{user.email}</Text>
+                    </View>
+
+                    <View style={styles.signOutButtonContainer}>
+                        <ThemedButton title="Sign Out" onPress={handleSignOut} />
+                    </View>
                 </View>
             ) : (
                 <View style={{ width: '100%', alignItems: 'center' }}>
@@ -176,6 +259,7 @@ const styles = StyleSheet.create({
     container: {
         alignItems: 'center',
         padding: 20,
+        width: '100%',
     },
     profilePictureContainer: {
         position: 'relative',
@@ -217,6 +301,92 @@ const styles = StyleSheet.create({
     },
     editBadgeText: {
         fontSize: 18,
+    },
+    infoCard: {
+        ...theme.Component.Card,
+        width: '100%',
+        marginBottom: theme.Spacing.Gap.Md,
+    },
+    infoRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    infoLabel: {
+        fontSize: 14,
+        color: theme.Colors.Text.Secondary,
+        marginBottom: 8,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    infoValue: {
+        fontSize: 18,
+        color: theme.Colors.Text.Primary,
+        fontWeight: '500',
+    },
+    editButton: {
+        fontSize: 14,
+        color: theme.Colors.Accent,
+        fontWeight: '600',
+    },
+    saveButtonText: {
+        fontSize: 14,
+        color: theme.Colors.Accent,
+        fontWeight: '600',
+    },
+    cancelButtonText: {
+        fontSize: 14,
+        color: '#EF4444', // Red color for cancel
+        fontWeight: '600',
+    },
+    input: {
+        backgroundColor: theme.Colors.Background.Primary,
+        borderWidth: 1,
+        borderColor: theme.Colors.Border,
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        color: theme.Colors.Text.Primary,
+        marginBottom: 12,
+    },
+    buttonRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: 12,
+    },
+    primaryButton: {
+        backgroundColor: theme.Colors.Accent,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 8,
+        minWidth: 80,
+        alignItems: 'center',
+    },
+    primaryButtonText: {
+        color: theme.Colors.TextOnAccent,
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    secondaryButton: {
+        backgroundColor: 'transparent',
+        borderWidth: 1,
+        borderColor: theme.Colors.Border,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 8,
+        minWidth: 80,
+        alignItems: 'center',
+    },
+    secondaryButtonText: {
+        color: theme.Colors.Text.Primary,
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    signOutButtonContainer: {
+        width: '100%',
+        marginTop: theme.Spacing.Gap.Md,
     },
     text: {
         fontSize: 16,
