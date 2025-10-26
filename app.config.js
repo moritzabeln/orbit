@@ -10,7 +10,12 @@ export default {
     newArchEnabled: true,
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.mabeln.orbit"
+      bundleIdentifier: "com.mabeln.orbit",
+      infoPlist: {
+        NSLocationAlwaysAndWhenInUseUsageDescription: "Orbit needs your location to share it with your groups, even when the app is in the background.",
+        NSLocationWhenInUseUsageDescription: "Orbit needs your location to share it with your groups.",
+      },
+      backgroundModes: ["location"]
     },
     android: {
       edgeToEdgeEnabled: true,
@@ -20,6 +25,8 @@ export default {
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
         "INTERNET"
       ],
       config: {

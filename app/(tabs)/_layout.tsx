@@ -2,51 +2,88 @@ import theme from "@/src/theme/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React, { useEffect } from "react";
-import { onAuthStateChange } from "../../src/services/authService";
+import { getCurrentUser, onAuthStateChange } from "../../src/services/authService";
 import { getBatteryInfo } from "../../src/services/batteryService";
 import { updatePositionInAllGroups, updateUserBattery } from "../../src/services/databaseService";
-import { watchLocation } from "../../src/services/locationService";
+import {
+  defineLocationTask,
+  startBackgroundLocationUpdates,
+  startForegroundLocationUpdates,
+  stopBackgroundLocationUpdates,
+  UserLocation
+} from "../../src/services/locationService";
+
+// Define the background location task at the top level
+defineLocationTask(async (location: UserLocation) => {
+  try {
+    const user = getCurrentUser();
+    if (!user) {
+      console.log('[Background] No authenticated user, skipping update');
+      return;
+    }
+
+    // Update position in all groups
+    await updatePositionInAllGroups(user.uid, location.latitude, location.longitude);
+
+    // Also update battery info alongside location
+    const batteryInfo = await getBatteryInfo();
+    if (batteryInfo.level >= 0) {
+      await updateUserBattery(user.uid, batteryInfo.level, batteryInfo.state);
+      console.log(`[Background] Position & Battery updated: ${batteryInfo.level}%, charging: ${batteryInfo.isCharging}`);
+    }
+  } catch (error) {
+    console.error('[Background] Error updating position/battery:', error);
+  }
+});
 
 export default function RootLayout() {
   useEffect(() => {
-    let locationUnsubscribe: (() => void) | null = null;
+    let foregroundUnsubscribe: (() => void) | null = null;
 
-    const authUnsubscribe = onAuthStateChange((user) => {
+    const authUnsubscribe = onAuthStateChange(async (user) => {
       if (user) {
-        // User is authenticated, start location tracking
-        locationUnsubscribe = watchLocation(
+        // Start foreground location tracking (10 seconds)
+        foregroundUnsubscribe = startForegroundLocationUpdates(
           async (location) => {
             try {
-              // Update position in all groups the user belongs to
               await updatePositionInAllGroups(user.uid, location.latitude, location.longitude);
 
-              // Also update battery info alongside location
               const batteryInfo = await getBatteryInfo();
               if (batteryInfo.level >= 0) {
                 await updateUserBattery(user.uid, batteryInfo.level, batteryInfo.state);
-                console.log(`Location & Battery updated: ${batteryInfo.level}%, charging: ${batteryInfo.isCharging}`);
+                console.log(`[Foreground] Position & Battery updated: ${batteryInfo.level}%, charging: ${batteryInfo.isCharging}`);
               }
             } catch (error) {
-              console.error('Error updating position/battery:', error);
+              console.error('[Foreground] Error updating:', error);
             }
           },
           (error) => {
-            console.error('Location tracking error:', error);
+            console.error('[Foreground] Location error:', error);
           }
         );
+
+        // Start background location tracking (30 seconds)
+        const started = await startBackgroundLocationUpdates();
+        if (started) {
+          console.log('[App] Location tracking started (foreground: 10s, background: 30s)');
+        } else {
+          console.warn('[App] Failed to start background location tracking');
+        }
       } else {
         // User is not authenticated, stop tracking
-        if (locationUnsubscribe) {
-          locationUnsubscribe();
-          locationUnsubscribe = null;
+        if (foregroundUnsubscribe) {
+          foregroundUnsubscribe();
+          foregroundUnsubscribe = null;
         }
+        await stopBackgroundLocationUpdates();
+        console.log('[App] Location tracking stopped');
       }
     });
 
     return () => {
       authUnsubscribe();
-      if (locationUnsubscribe) {
-        locationUnsubscribe();
+      if (foregroundUnsubscribe) {
+        foregroundUnsubscribe();
       }
     };
   }, []);
