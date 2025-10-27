@@ -15,7 +15,12 @@ export default {
         NSLocationAlwaysAndWhenInUseUsageDescription: "Orbit needs your location to share it with your groups, even when the app is in the background.",
         NSLocationWhenInUseUsageDescription: "Orbit needs your location to share it with your groups.",
       },
-      backgroundModes: ["location"]
+      backgroundModes: ["location"],
+      config: {
+        googleMaps: {
+          apiKey: process.env.GOOGLE_MAPS_API_KEY
+        }
+      }
     },
     android: {
       edgeToEdgeEnabled: true,

@@ -1,5 +1,5 @@
 import { get, getDatabase, off, onValue, push, ref, set } from 'firebase/database';
-import { Group, MemberLocation, UserProfile, UserWithProfile } from '../models/database';
+import { Group, MemberLocation, Place, UserProfile, UserWithProfile } from '../models/database';
 import { getCurrentUser } from './authService';
 import app from './firebaseConfig';
 
@@ -219,4 +219,60 @@ export const updateUserBattery = async (userId: string, batteryLevel: number, ba
     };
 
     await set(profileRef, updatedProfile);
+};
+
+/**
+ * Save a place to a group
+ * @param groupId - The group ID
+ * @param place - The place data
+ */
+export const savePlace = async (groupId: string, place: { name: string; lat: number; lng: number; radius: number }) => {
+    const placesRef = ref(database, `groups/${groupId}/places`);
+    const newPlaceRef = push(placesRef);
+    await set(newPlaceRef, {
+        ...place,
+        createdAt: Date.now(),
+    });
+};
+
+/**
+ * Update an existing place in a group
+ * @param groupId - The group ID
+ * @param placeId - The place ID
+ * @param place - The updated place data
+ */
+export const updatePlace = async (groupId: string, placeId: string, place: { name: string; lat: number; lng: number; radius: number }) => {
+    const placeRef = ref(database, `groups/${groupId}/places/${placeId}`);
+    await set(placeRef, {
+        ...place,
+        createdAt: Date.now(), // Update timestamp
+    });
+};
+
+/**
+ * Get all places for a group
+ * @param groupId - The group ID
+ * @param callback - Callback function that receives the array of places
+ * @returns Unsubscribe function
+ */
+export const getGroupPlaces = (groupId: string, callback: (places: Place[]) => void) => {
+    const placesRef = ref(database, `groups/${groupId}/places`);
+
+    const listener = onValue(placesRef, (snapshot) => {
+        const places: Place[] = [];
+        snapshot.forEach((childSnapshot) => {
+            const placeData = childSnapshot.val();
+            places.push({
+                id: childSnapshot.key!,
+                name: placeData.name,
+                lat: placeData.lat,
+                lng: placeData.lng,
+                radius: placeData.radius,
+                createdAt: placeData.createdAt
+            });
+        });
+        callback(places);
+    });
+
+    return () => off(placesRef, 'value', listener);
 };

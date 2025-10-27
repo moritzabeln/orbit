@@ -60,6 +60,18 @@ export interface MemberLocation {
     speed?: number;   // Optional speed in m/s
 }
 
+/**
+ * Place data stored at: /groups/{groupId}/places/{placeId}
+ */
+export interface Place {
+    id: string;
+    name: string;
+    lat: number;
+    lng: number;
+    radius: number;
+    createdAt: number;
+}
+
 // ============================================================================
 // Composed Types (combining base models)
 // ============================================================================
