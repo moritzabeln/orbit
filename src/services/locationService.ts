@@ -1,6 +1,5 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import { MemberLocation } from '../models/database';
 
 const LOCATION_TASK_NAME = 'BACKGROUND_LOCATION_TASK';
 
@@ -56,37 +55,6 @@ export const getCurrentLocation = async (): Promise<UserLocation | null> => {
 };
 
 /**
- * Define the background location task
- * This must be called at the top level (not inside a function/component)
- */
-export const defineLocationTask = (
-    callback: (userLocations: MemberLocation[]) => void
-) => {
-    TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }: any) => {
-        if (error) {
-            console.error('[Location Task] Error:', error);
-            return;
-        }
-
-        if (data) {
-            const { locations } = data;
-            console.log('[Location Task] Locations received:', locations);
-            if (locations && locations.length > 0) {
-                const userLocations: MemberLocation[] = locations.map((loc: Location.LocationObject) => ({
-                    latitude: loc.coords.latitude,
-                    longitude: loc.coords.longitude,
-                    accuracy: loc.coords.accuracy,
-                    timestamp: loc.timestamp,
-                    heading: loc.coords.heading,
-                    speed: loc.coords.speed,
-                }));
-                callback(userLocations);
-            }
-        }
-    });
-};
-
-/**
  * Start background location updates
  * Uses startLocationUpdatesAsync for background tracking with less frequent updates
  */
@@ -97,7 +65,7 @@ export const startBackgroundLocationUpdates = async (): Promise<boolean> => {
 
         if (isRegistered) {
             // For debugging.
-            const forceRestart = false;
+            const forceRestart = true;
             if (forceRestart) {
                 await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
                 console.log('[Background Location] Restarting task as forceRestart is true');
