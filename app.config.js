@@ -23,6 +23,10 @@ export default {
       }
     },
     android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/images/icon.png",
+        monochromeImage: "./assets/images/icon-monochrome.png",
+      },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: "com.mabeln.orbit",
