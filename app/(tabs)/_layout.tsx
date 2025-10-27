@@ -21,7 +21,7 @@ defineLocationTask(async (userLocations: MemberLocation[]) => {
   try {
     const user = getCurrentUser();
     if (!user) {
-      console.log('[Background] No authenticated user, skipping update');
+      console.log('[Background Task] No authenticated user, skipping update');
       return;
     }
 
@@ -32,10 +32,10 @@ defineLocationTask(async (userLocations: MemberLocation[]) => {
     const batteryInfo = await getBatteryInfo();
     if (batteryInfo.level >= 0) {
       await updateUserBattery(user.uid, batteryInfo.level, batteryInfo.state);
-      console.log(`[Background] Position & Battery updated: ${batteryInfo.level}%, charging: ${batteryInfo.isCharging}`);
+      console.log(`[Background Task] Position & Battery updated: ${batteryInfo.level}%, charging: ${batteryInfo.isCharging}`);
     }
   } catch (error) {
-    console.error('[Background] Error updating position/battery:', error);
+    console.error('[Background Task] Error updating position/battery:', error);
   }
 });
 
