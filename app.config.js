@@ -42,6 +42,14 @@ export default {
     plugins: [
       "expo-router",
       [
+        "expo-location",
+        {
+          locationAlwaysAndWhenInUsePermission: "Orbit needs your location to share it with your groups, even when the app is in the background.",
+          locationWhenInUsePermission: "Orbit needs your location to share it with your groups.",
+        }
+      ],
+      "expo-task-manager",
+      [
         "expo-splash-screen",
         {
           image: "./assets/images/icon.png",

@@ -103,7 +103,7 @@ function HomeScreen() {
                         userId: userId,
                         latitude: position.latitude,
                         longitude: position.longitude,
-                        lastUpdated: position.lastUpdated
+                        timestamp: position.timestamp
                     });
                 }
             });

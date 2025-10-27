@@ -1,12 +1,12 @@
 import { get, getDatabase, off, onValue, push, ref, set } from 'firebase/database';
-import { Group, MemberPosition, UserProfile, UserWithProfile } from '../models/database';
+import { Group, MemberLocation, UserProfile, UserWithProfile } from '../models/database';
 import { getCurrentUser } from './authService';
 import app from './firebaseConfig';
 
 const database = getDatabase(app);
 
 // Re-export models for backward compatibility
-export type { Group, MemberPosition, UserProfile, UserWithProfile };
+export type { Group, MemberLocation as MemberPosition, UserProfile, UserWithProfile };
 
 export const createGroup = async (name: string): Promise<string> => {
     const user = getCurrentUser();
@@ -64,7 +64,7 @@ export const updateMemberPosition = async (groupId: string, userId: string, lati
     });
 };
 
-export const updatePositionInAllGroups = async (userId: string, latitude: number, longitude: number) => {
+export const updatePositionInAllGroups = async (userId: string, location: MemberLocation) => {
     // First get all groups the user is in
     const groupsRef = ref(database, 'groups');
     const snapshot = await get(groupsRef);
@@ -77,8 +77,7 @@ export const updatePositionInAllGroups = async (userId: string, latitude: number
             // User is a member of this group, update their position
             const positionRef = ref(database, `groups/${childSnapshot.key}/positions/${userId}`);
             updatePromises.push(set(positionRef, {
-                latitude,
-                longitude,
+                ...location,
                 lastUpdated: Date.now()
             }));
         }
@@ -87,17 +86,17 @@ export const updatePositionInAllGroups = async (userId: string, latitude: number
     await Promise.all(updatePromises);
 };
 
-export const getGroupPositions = (groupId: string, callback: (positions: { [userId: string]: MemberPosition }) => void) => {
+export const getGroupPositions = (groupId: string, callback: (positions: { [userId: string]: MemberLocation }) => void) => {
     const positionsRef = ref(database, `groups/${groupId}/positions`);
 
     const listener = onValue(positionsRef, (snapshot) => {
-        const positions: { [userId: string]: MemberPosition } = {};
+        const positions: { [userId: string]: MemberLocation } = {};
         snapshot.forEach((childSnapshot) => {
             const positionData = childSnapshot.val();
             positions[childSnapshot.key!] = {
                 latitude: positionData.latitude,
                 longitude: positionData.longitude,
-                lastUpdated: positionData.lastUpdated
+                timestamp: positionData.lastUpdated
             };
         });
         callback(positions);

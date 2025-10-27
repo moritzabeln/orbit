@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
+import { MemberLocation } from '../models/database';
 
 const LOCATION_TASK_NAME = 'BACKGROUND_LOCATION_TASK';
 
@@ -59,7 +60,7 @@ export const getCurrentLocation = async (): Promise<UserLocation | null> => {
  * This must be called at the top level (not inside a function/component)
  */
 export const defineLocationTask = (
-    callback: (location: UserLocation) => void
+    callback: (userLocations: MemberLocation[]) => void
 ) => {
     TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }: any) => {
         if (error) {
@@ -69,72 +70,20 @@ export const defineLocationTask = (
 
         if (data) {
             const { locations } = data;
-            const latestLocation = locations[0];
-
-            if (latestLocation) {
-                const userLocation: UserLocation = {
-                    latitude: latestLocation.coords.latitude,
-                    longitude: latestLocation.coords.longitude,
-                    accuracy: latestLocation.coords.accuracy,
-                    timestamp: latestLocation.timestamp,
-                };
-
-                console.log('[Background Location] Update received:', userLocation);
-                callback(userLocation);
+            console.log('[Location Task] Locations received:', locations);
+            if (locations && locations.length > 0) {
+                const userLocations: MemberLocation[] = locations.map((loc: Location.LocationObject) => ({
+                    latitude: loc.coords.latitude,
+                    longitude: loc.coords.longitude,
+                    accuracy: loc.coords.accuracy,
+                    timestamp: loc.timestamp,
+                    heading: loc.coords.heading,
+                    speed: loc.coords.speed,
+                }));
+                callback(userLocations);
             }
         }
     });
-};
-
-/**
- * Start foreground location updates
- * Uses watchPositionAsync for more frequent updates while app is active
- */
-export const startForegroundLocationUpdates = (
-    callback: (location: UserLocation) => void,
-    errorCallback?: (error: any) => void
-): (() => void) => {
-    let subscription: Location.LocationSubscription | null = null;
-
-    const startWatching = async () => {
-        try {
-            const hasPermission = await requestLocationPermissions();
-            if (!hasPermission) {
-                errorCallback?.(new Error('Location permission denied'));
-                return;
-            }
-
-            subscription = await Location.watchPositionAsync(
-                {
-                    accuracy: Location.Accuracy.High,
-                    timeInterval: 10000, // Update every 10 seconds
-                    distanceInterval: 10, // Or when moved 10 meters
-                },
-                (location) => {
-                    const userLocation: UserLocation = {
-                        latitude: location.coords.latitude,
-                        longitude: location.coords.longitude,
-                        accuracy: location.coords.accuracy,
-                        timestamp: location.timestamp,
-                    };
-                    console.log('[Foreground Location] Update received:', userLocation);
-                    callback(userLocation);
-                }
-            );
-        } catch (error) {
-            console.error('[Foreground Location] Error watching location:', error);
-            errorCallback?.(error);
-        }
-    };
-
-    startWatching();
-
-    return () => {
-        if (subscription) {
-            subscription.remove();
-            console.log('[Foreground Location] Stopped');
-        }
-    };
 };
 
 /**
@@ -147,8 +96,15 @@ export const startBackgroundLocationUpdates = async (): Promise<boolean> => {
         const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
 
         if (isRegistered) {
-            console.log('[Background Location] Already running');
-            return true;
+            // For debugging.
+            const forceRestart = false;
+            if (forceRestart) {
+                await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+                console.log('[Background Location] Restarting task as forceRestart is true');
+            } else {
+                console.log('[Background Location] Already running');
+                return true;
+            }
         }
 
         // Request background permissions
@@ -160,12 +116,14 @@ export const startBackgroundLocationUpdates = async (): Promise<boolean> => {
 
         // Start location updates
         await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-            accuracy: Location.Accuracy.Balanced,
-            timeInterval: 30000, // Update every 30 seconds in background
-            distanceInterval: 50, // Or when moved 50 meters
+            accuracy: Location.Accuracy.Highest,
+            timeInterval: 10000, // Update every 10 seconds in background
+            distanceInterval: 10, // Or when moved 10 meters
+            deferredUpdatesInterval: 30000,
             foregroundService: {
                 notificationTitle: 'Orbit is tracking your location',
                 notificationBody: 'Sharing location with your groups',
+                killServiceOnDestroy: false,
             },
             pausesUpdatesAutomatically: false,
             activityType: Location.ActivityType.Fitness,

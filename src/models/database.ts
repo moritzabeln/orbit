@@ -49,12 +49,15 @@ export interface Group {
 }
 
 /**
- * Member position data stored at: /groups/{groupId}/positions/{userId}
+ * Member location data stored at: /groups/{groupId}/positions/{userId}
  */
-export interface MemberPosition {
+export interface MemberLocation {
     latitude: number;
     longitude: number;
-    lastUpdated: number;
+    timestamp: number;
+    accuracy?: number; // Optional accuracy in meters
+    heading?: number; // Optional heading in degrees
+    speed?: number;   // Optional speed in m/s
 }
 
 // ============================================================================
@@ -75,5 +78,5 @@ export interface UserWithProfile {
 export interface UserWithPosition {
     userId: string;
     profile: UserProfile;
-    position: MemberPosition;
+    position: MemberLocation;
 }
