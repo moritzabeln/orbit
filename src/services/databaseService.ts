@@ -27,6 +27,12 @@ export const createGroup = async (name: string): Promise<string> => {
     return newGroupRef.key!;
 };
 
+/**
+ * Get all groups that a user is a member of
+ * @param userId - The user ID
+ * @param callback - Callback function that receives the array of groups
+ * @returns Unsubscribe function
+ */
 export const getUserGroups = (userId: string, callback: (groups: Group[]) => void) => {
     const groupsRef = ref(database, 'groups');
 

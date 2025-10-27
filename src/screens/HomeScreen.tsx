@@ -1,14 +1,14 @@
 import MapProfilePicture from '@/src/components/MapProfilePicture';
 import ThemedButton from '@/src/components/ThemedButton';
+import { MemberLocation, Place, UserWithLocation } from '@/src/models/database';
+import { onAuthStateChange } from '@/src/services/authService';
+import { getGroupPlaces, getGroupPositions, getUserGroups } from '@/src/services/databaseService';
 import theme from '@/src/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { User } from 'firebase/auth';
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
-import { MemberLocation, UserWithLocation } from '../models/database';
-import { onAuthStateChange } from '../services/authService';
-import { getGroupPositions, getUserGroups } from '../services/databaseService';
+import MapView, { Circle, Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
 
 type Position = { latitude: number; longitude: number };
 
@@ -47,6 +47,7 @@ function HomeScreen() {
     }));
     const [user, setUser] = useState<User | null>(null);
     const [allPositions, setAllPositions] = useState<{ [groupId: string]: { [userId: string]: MemberLocation } }>({});
+    const [allPlaces, setAllPlaces] = useState<{ [groupId: string]: Place[] }>({});
 
     // Auth state listener
     useEffect(() => {
@@ -57,21 +58,25 @@ function HomeScreen() {
         return unsubscribeAuth;
     }, []);
 
-    // Groups and positions listeners
+    // Groups, positions, and places listeners
     useEffect(() => {
         if (!user) {
             setAllPositions({});
+            setAllPlaces({});
             return;
         }
 
         let positionUnsubscribers: (() => void)[] = [];
+        let placesUnsubscribers: (() => void)[] = [];
 
         const unsubscribeGroups = getUserGroups(user.uid, (userGroups) => {
-            // Clean up old position listeners
+            // Clean up old listeners
             positionUnsubscribers.forEach(unsubscribe => unsubscribe());
+            placesUnsubscribers.forEach(unsubscribe => unsubscribe());
             positionUnsubscribers = [];
+            placesUnsubscribers = [];
 
-            // Set up position listeners for all groups
+            // Set up position and places listeners for all groups
             userGroups.forEach((group) => {
                 const unsubscribePositions = getGroupPositions(group.id, (positions) => {
                     setAllPositions(prev => ({
@@ -80,12 +85,21 @@ function HomeScreen() {
                     }));
                 });
                 positionUnsubscribers.push(unsubscribePositions);
+
+                const unsubscribePlaces = getGroupPlaces(group.id, (places) => {
+                    setAllPlaces(prev => ({
+                        ...prev,
+                        [group.id]: places
+                    }));
+                });
+                placesUnsubscribers.push(unsubscribePlaces);
             });
         });
 
         return () => {
             unsubscribeGroups();
             positionUnsubscribers.forEach(unsubscribe => unsubscribe());
+            placesUnsubscribers.forEach(unsubscribe => unsubscribe());
         };
     }, [user]);
 
@@ -175,6 +189,33 @@ function HomeScreen() {
                             showSpeedBadge={true}
                         />
                     </Marker>
+                ))}
+
+                {/* Show places as circles with location icons */}
+                {Object.values(allPlaces).flat().map((place) => (
+                    <React.Fragment key={place.id}>
+                        <Circle
+                            center={{ latitude: place.lat, longitude: place.lng }}
+                            radius={place.radius}
+                            strokeColor={theme.Colors.Accent}
+                            fillColor={`${theme.Colors.Accent}20`}
+                            strokeWidth={2}
+                        />
+                        <Marker
+                            coordinate={{ latitude: place.lat, longitude: place.lng }}
+                            anchor={{ x: 0.5, y: 0.5 }}
+                        >
+                            <View style={{
+                                backgroundColor: theme.Colors.Background.Secondary,
+                                borderRadius: 20,
+                                padding: 4,
+                                borderWidth: 1,
+                                borderColor: theme.Colors.Accent,
+                            }}>
+                                <Ionicons name="location" size={16} color={theme.Colors.Accent} />
+                            </View>
+                        </Marker>
+                    </React.Fragment>
                 ))}
             </MapView>
             {/* Custom re-center button */}
