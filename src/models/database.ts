@@ -72,6 +72,14 @@ export interface Place {
     createdAt: number;
 }
 
+/**
+ * Member at place data stored at: /groups/{groupId}/membersAtPlaces/{placeId}/{userId}
+ */
+export interface MemberAtPlace {
+    userId: string;
+    arrivedAt: number;
+}
+
 // ============================================================================
 // Composed Types (combining base models)
 // ============================================================================

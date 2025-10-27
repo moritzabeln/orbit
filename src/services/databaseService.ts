@@ -1,5 +1,5 @@
-import { get, getDatabase, off, onValue, push, ref, set } from 'firebase/database';
-import { Group, MemberLocation, Place, UserProfile, UserWithProfile } from '../models/database';
+import { get, getDatabase, off, onValue, push, ref, remove, set } from 'firebase/database';
+import { Group, MemberAtPlace, MemberLocation, Place, UserProfile, UserWithProfile } from '../models/database';
 import { getCurrentUser } from './authService';
 import app from './firebaseConfig';
 
@@ -281,4 +281,67 @@ export const getGroupPlaces = (groupId: string, callback: (places: Place[]) => v
     });
 
     return () => off(placesRef, 'value', listener);
+};
+
+/**
+ * Set a member at a place in the database
+ * @param groupId - The group ID
+ * @param placeId - The place ID
+ * @param userId - The user ID
+ * @param data - Member at place data
+ */
+export const setMemberAtPlace = async (
+    groupId: string,
+    placeId: string,
+    userId: string,
+    data: MemberAtPlace
+) => {
+    const memberAtPlaceRef = ref(database, `groups/${groupId}/membersAtPlaces/${placeId}/${userId}`);
+    await set(memberAtPlaceRef, data);
+};
+
+/**
+ * Remove a member from a place in the database
+ * @param groupId - The group ID
+ * @param placeId - The place ID
+ * @param userId - The user ID
+ */
+export const removeMemberFromPlace = async (
+    groupId: string,
+    placeId: string,
+    userId: string
+) => {
+    const memberAtPlaceRef = ref(database, `groups/${groupId}/membersAtPlaces/${placeId}/${userId}`);
+    await remove(memberAtPlaceRef);
+};
+
+/**
+ * Get all members at places for a group
+ * @param groupId - The group ID
+ * @param callback - Callback function that receives the members at places data
+ * @returns Unsubscribe function
+ */
+export const getMembersAtPlaces = (
+    groupId: string,
+    callback: (data: { [placeId: string]: { [userId: string]: MemberAtPlace } }) => void
+) => {
+    const membersAtPlacesRef = ref(database, `groups/${groupId}/membersAtPlaces`);
+
+    const listener = onValue(membersAtPlacesRef, (snapshot) => {
+        const data: { [placeId: string]: { [userId: string]: MemberAtPlace } } = {};
+
+        snapshot.forEach((placeSnapshot) => {
+            const placeId = placeSnapshot.key!;
+            data[placeId] = {};
+
+            placeSnapshot.forEach((memberSnapshot) => {
+                const userId = memberSnapshot.key!;
+                data[placeId][userId] = memberSnapshot.val() as MemberAtPlace;
+            });
+        });
+
+        callback(data);
+    });
+
+    return () => off(membersAtPlacesRef, 'value', listener);
 };

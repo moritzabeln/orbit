@@ -1,7 +1,7 @@
 # Copilot Instructions for AI Coding Agents
 
 ## General Guidelines
-- Don't output documentation files unless explicitly asked.
+- Don't create documentation files unless explicitly asked.
 - Check online resources if unsure about specific libraries or APIs.
 - Follow modern best practices for React Native and TypeScript development.
 
