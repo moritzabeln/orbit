@@ -155,7 +155,7 @@ function HomeScreen() {
                 initialRegion={initialRegion}
                 onRegionChangeComplete={onRegionChanged}
                 onMapReady={onMapReady}
-                userInterfaceStyle='dark'
+                customMapStyle={require('@/assets/map-style.json')}
             >
                 {/* Show group members as profile icons */}
                 {memberPositions.map((member) => (
