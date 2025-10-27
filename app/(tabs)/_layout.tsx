@@ -1,27 +1,26 @@
+import { locationPlaceIntegration } from "@//src/services/locationPlaceIntegration";
 import {
-  startBackgroundLocationUpdates,
-  stopBackgroundLocationUpdates
-} from "@/src/services/locationService";
-import theme from "@/src/theme/theme";
-import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
-
-// Import the task definition at the global scope
-// This ensures TaskManager.defineTask is called before the task is registered
+  notifyMemberArrived,
+  notifyMemberLeft,
+  requestNotificationPermissions
+} from "@//src/services/notificationService";
 import { onAuthStateChange } from "@/src/services/authService";
 import {
   getMembersAtPlaces,
   getUserGroups,
   getUserProfile
 } from "@/src/services/databaseService";
-import "@/src/services/locationTaskDefinition";
-import React, { useEffect, useRef } from "react";
-import { locationPlaceIntegration } from "../../src/services/locationPlaceIntegration";
 import {
-  notifyMemberArrived,
-  notifyMemberLeft,
-  requestNotificationPermissions
-} from "../../src/services/notificationService";
+  startBackgroundLocationUpdates,
+  stopBackgroundLocationUpdates
+} from "@/src/services/locationService";
+// Import the task definition at the global scope
+// This ensures TaskManager.defineTask is called before the task is registered
+import "@/src/services/locationTaskDefinition";
+import theme from "@/src/theme/theme";
+import { Ionicons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+import React, { useEffect, useRef } from "react";
 
 export default function RootLayout() {
   const previousMembersAtPlaces = useRef<{ [groupId: string]: { [placeId: string]: { [userId: string]: any } } }>({});

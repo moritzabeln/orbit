@@ -4,6 +4,7 @@ import { MemberLocation } from '../models/database';
 import { getCurrentUser } from './authService';
 import { getBatteryInfo } from './batteryService';
 import { updatePositionInAllGroups, updateUserBattery } from './databaseService';
+import { locationPlaceIntegration } from './locationPlaceIntegration';
 
 const LOCATION_TASK_NAME = 'BACKGROUND_LOCATION_TASK';
 
@@ -44,6 +45,9 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }: any) => {
                 // Get the latest location
                 const latestLocation = userLocations.sort((a, b) => b.timestamp - a.timestamp)[0];
                 await updatePositionInAllGroups(user.uid, latestLocation);
+
+                // Process location for place detection across all groups
+                await locationPlaceIntegration.processLocationUpdate(latestLocation);
 
                 // Also update battery info alongside location
                 const batteryInfo = await getBatteryInfo();
