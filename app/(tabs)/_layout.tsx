@@ -1,43 +1,16 @@
-import { MemberLocation } from "@/src/models/database";
+import { onAuthStateChange } from "@/src/services/authService";
+import {
+  startBackgroundLocationUpdates,
+  stopBackgroundLocationUpdates
+} from "@/src/services/locationService";
 import theme from "@/src/theme/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React, { useEffect } from "react";
-import { getCurrentUser, onAuthStateChange } from "../../src/services/authService";
-import { getBatteryInfo } from "../../src/services/batteryService";
-import { updatePositionInAllGroups, updateUserBattery } from "../../src/services/databaseService";
-import {
-  defineLocationTask,
-  startBackgroundLocationUpdates,
-  stopBackgroundLocationUpdates
-} from "../../src/services/locationService";
 
-/**
- * Background location task that
- * - updates the user's position in all groups
- * - updates the user's battery info
- */
-defineLocationTask(async (userLocations: MemberLocation[]) => {
-  try {
-    const user = getCurrentUser();
-    if (!user) {
-      console.log('[Background Task] No authenticated user, skipping update');
-      return;
-    }
-
-    const latestLocation = userLocations.sort((a, b) => b.timestamp - a.timestamp)[0];
-    await updatePositionInAllGroups(user.uid, latestLocation);
-
-    // Also update battery info alongside location
-    const batteryInfo = await getBatteryInfo();
-    if (batteryInfo.level >= 0) {
-      await updateUserBattery(user.uid, batteryInfo.level, batteryInfo.state);
-      console.log(`[Background Task] Position & Battery updated: ${batteryInfo.level}%, charging: ${batteryInfo.isCharging}`);
-    }
-  } catch (error) {
-    console.error('[Background Task] Error updating position/battery:', error);
-  }
-});
+// Import the task definition at the global scope
+// This ensures TaskManager.defineTask is called before the task is registered
+import "@/src/services/locationTaskDefinition";
 
 export default function RootLayout() {
   useEffect(() => {
