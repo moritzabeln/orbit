@@ -1,6 +1,7 @@
 import PageHeader from "@/src/components/PageHeader";
 import ThemedButton from "@/src/components/ThemedButton";
 import theme from "@/src/theme/theme";
+import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { getCurrentPositionAsync } from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -29,7 +30,8 @@ export default function AddPlaceScreen() {
         const latDelta = (2 * radiusMeters) / 111000;
         // 1 degree longitude ≈ 111,000 * cos(latitude) meters
         const lngDelta = (2 * radiusMeters) / (111000 * Math.cos(lat * Math.PI / 180));
-        return { latitudeDelta: latDelta, longitudeDelta: lngDelta };
+        const offset = 0.005; // Small offset to ensure full visibility
+        return { latitudeDelta: latDelta + offset, longitudeDelta: lngDelta + offset };
     };
 
     useEffect(() => {
@@ -109,8 +111,18 @@ export default function AddPlaceScreen() {
                 >
                     <Marker
                         coordinate={{ latitude: region.latitude, longitude: region.longitude }}
-                        tracksViewChanges={false}
-                    />
+                        anchor={{ x: 0.5, y: 0.5 }}
+                    >
+                        <View style={{
+                            backgroundColor: theme.Colors.Background.Secondary,
+                            borderRadius: 20,
+                            padding: 4,
+                            borderWidth: 1,
+                            borderColor: theme.Colors.Accent,
+                        }}>
+                            <Ionicons name="location" size={16} color={theme.Colors.Accent} />
+                        </View>
+                    </Marker>
                     <Circle
                         center={{ latitude: region.latitude, longitude: region.longitude }}
                         radius={radius}
