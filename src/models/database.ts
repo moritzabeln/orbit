@@ -75,8 +75,8 @@ export interface UserWithProfile {
 /**
  * User with position data (for displaying on map)
  */
-export interface UserWithPosition {
+export interface UserWithLocation {
     userId: string;
     profile: UserProfile;
-    position: MemberLocation;
+    location: MemberLocation;
 }

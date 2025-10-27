@@ -5,9 +5,6 @@ import app from './firebaseConfig';
 
 const database = getDatabase(app);
 
-// Re-export models for backward compatibility
-export type { Group, MemberLocation as MemberPosition, UserProfile, UserWithProfile };
-
 export const createGroup = async (name: string): Promise<string> => {
     const user = getCurrentUser();
     if (!user) {
@@ -96,7 +93,10 @@ export const getGroupPositions = (groupId: string, callback: (positions: { [user
             positions[childSnapshot.key!] = {
                 latitude: positionData.latitude,
                 longitude: positionData.longitude,
-                timestamp: positionData.lastUpdated
+                timestamp: positionData.lastUpdated,
+                accuracy: positionData.accuracy,
+                heading: positionData.heading,
+                speed: positionData.speed
             };
         });
         callback(positions);

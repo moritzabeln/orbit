@@ -1,4 +1,4 @@
-import ProfilePicture from '@/src/components/ProfilePicture';
+import MapProfilePicture from '@/src/components/MapProfilePicture';
 import ThemedButton from '@/src/components/ThemedButton';
 import theme from '@/src/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,12 +6,9 @@ import { User } from 'firebase/auth';
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
+import { MemberLocation, UserWithLocation } from '../models/database';
 import { onAuthStateChange } from '../services/authService';
-import { getGroupPositions, getUserGroups, MemberPosition } from '../services/databaseService';
-
-interface MemberPositionWithId extends MemberPosition {
-    userId: string;
-}
+import { getGroupPositions, getUserGroups } from '../services/databaseService';
 
 type Position = { latitude: number; longitude: number };
 
@@ -49,7 +46,7 @@ function HomeScreen() {
         longitudeDelta: 0.1
     }));
     const [user, setUser] = useState<User | null>(null);
-    const [allPositions, setAllPositions] = useState<{ [groupId: string]: { [userId: string]: MemberPosition } }>({});
+    const [allPositions, setAllPositions] = useState<{ [groupId: string]: { [userId: string]: MemberLocation } }>({});
 
     // Auth state listener
     useEffect(() => {
@@ -94,16 +91,15 @@ function HomeScreen() {
 
     // Get all positions from all groups (memoized)
     const memberPositions = useMemo(() => {
-        const positions: MemberPositionWithId[] = [];
+        const positions: UserWithLocation[] = [];
 
         Object.entries(allPositions).forEach(([, groupPositions]) => {
             Object.entries(groupPositions).forEach(([userId, position]) => {
                 if (position.latitude && position.longitude) {
                     positions.push({
                         userId: userId,
-                        latitude: position.latitude,
-                        longitude: position.longitude,
-                        timestamp: position.timestamp
+                        profile: {}, // Profile can be fetched separately if needed
+                        location: position,
                     });
                 }
             });
@@ -115,7 +111,10 @@ function HomeScreen() {
     // Animate map to fit all markers when positions change
     useEffect(() => {
         if (memberPositions.length > 0 && mapRef.current) {
-            const newRegion = computeRegion(memberPositions);
+            const newRegion = computeRegion(memberPositions.map((member) => ({
+                latitude: member.location.latitude,
+                longitude: member.location.longitude
+            })));
             mapRef.current.animateToRegion(newRegion, 1000);
         }
     }, [memberPositions]);
@@ -156,20 +155,24 @@ function HomeScreen() {
                 initialRegion={initialRegion}
                 onRegionChangeComplete={onRegionChanged}
                 onMapReady={onMapReady}
+                userInterfaceStyle='dark'
             >
                 {/* Show group members as profile icons */}
                 {memberPositions.map((member) => (
                     <Marker
                         key={member.userId}
-                        coordinate={{ latitude: member.latitude, longitude: member.longitude }}
+                        coordinate={{ latitude: member.location.latitude, longitude: member.location.longitude }}
                         anchor={{ x: 0.5, y: 0.5 }}
+
                     >
-                        <ProfilePicture
+                        <MapProfilePicture
                             userId={member.userId}
                             size={50}
                             showBorder={true}
                             borderColor="#fff"
                             borderWidth={3}
+                            speed={member.location.speed}
+                            showSpeedBadge={true}
                         />
                     </Marker>
                 ))}

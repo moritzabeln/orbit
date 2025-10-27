@@ -6,8 +6,9 @@ import { User } from "firebase/auth";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { UserProfile } from "../models/database";
 import { onAuthStateChange, signInWithEmailPassword, signOutUser, signUpWithEmailPassword } from "../services/authService";
-import { getUserProfile, updateUserProfile, UserProfile } from "../services/databaseService";
+import { getUserProfile, updateUserProfile } from "../services/databaseService";
 import { getProfilePictureURL, uploadProfilePicture } from "../services/storageService";
 
 export default function AccountScreen() {

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, View, ViewStyle } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { getProfilePictureURL } from '../services/storageService';
 import theme from '../theme/theme';
 
@@ -13,6 +13,8 @@ interface ProfilePictureProps {
     style?: ViewStyle;
     onLoad?: () => void;
     onError?: () => void;
+    speed?: number; // Speed in m/s
+    showSpeedBadge?: boolean;
 }
 
 /**
@@ -34,6 +36,8 @@ const ProfilePicture: React.FC<ProfilePictureProps> = ({
     style,
     onLoad,
     onError,
+    speed,
+    showSpeedBadge = false,
 }) => {
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -90,25 +94,69 @@ const ProfilePicture: React.FC<ProfilePictureProps> = ({
 
     const iconSize = Math.max(size * 0.5, 16);
 
+    // Convert speed from m/s to km/h
+    const speedKmh = speed !== undefined && speed !== null ? Math.round(speed * 3.6) : 0;
+    const shouldShowBadge = showSpeedBadge;
+
     return (
-        <View style={containerStyle}>
-            {isLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-            ) : imageUrl && !hasError ? (
-                <Image
-                    source={{ uri: imageUrl }}
-                    style={imageStyle}
-                    onLoad={onLoad}
-                    onError={() => {
-                        setHasError(true);
-                        onError?.();
-                    }}
-                />
-            ) : (
-                <Ionicons name="person" size={iconSize} color="#fff" />
+        <View>
+            <View style={containerStyle}>
+                {isLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                ) : imageUrl && !hasError ? (
+                    <Image
+                        source={{ uri: imageUrl }}
+                        style={imageStyle}
+                        onLoad={onLoad}
+                        onError={() => {
+                            setHasError(true);
+                            onError?.();
+                        }}
+                    />
+                ) : (
+                    <Ionicons name="person" size={iconSize} color="#fff" />
+                )}
+            </View>
+            {shouldShowBadge && (
+                <View style={styles.speedBadge}>
+                    <Text style={styles.speedText}>{speedKmh}</Text>
+                    <Text style={styles.speedUnit}>km/h</Text>
+                </View>
             )}
         </View>
     );
 };
+
+const styles = StyleSheet.create({
+    speedBadge: {
+        position: 'absolute',
+        top: -10,
+        alignSelf: 'center',
+        backgroundColor: theme.Colors.Accent,
+        borderRadius: 12,
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        borderWidth: 2,
+        borderColor: '#fff',
+    },
+    speedText: {
+        color: '#fff',
+        fontSize: 9,
+        fontWeight: 'bold',
+    },
+    speedUnit: {
+        color: '#fff',
+        fontSize: 9,
+        fontWeight: '600',
+    },
+});
 
 export default ProfilePicture;
