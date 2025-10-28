@@ -5,6 +5,11 @@ export default {
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
+    notification: {
+      icon: "./assets/images/icon-notification.png",
+      color: "#8887ff",
+      iosDisplayInForeground: true
+    },
     scheme: "orbit",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
@@ -29,6 +34,7 @@ export default {
         backgroundImage: "./assets/images/icon-background.png",
         backgroundColor: "#8887ff"
       },
+      icon: "./assets/images/icon.png",
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: "com.mabeln.orbit",
@@ -55,6 +61,8 @@ export default {
       [
         "expo-location",
         {
+          isAndroidBackgroundLocationEnabled: true,
+          isIosBackgroundLocationEnabled: true,
           locationAlwaysAndWhenInUsePermission: "Orbit needs your location to share it with your groups, even when the app is in the background.",
           locationWhenInUsePermission: "Orbit needs your location to share it with your groups.",
         }

@@ -1,9 +1,9 @@
 import PageHeader from "@/src/components/PageHeader";
 import ThemedButton from "@/src/components/ThemedButton";
+import { getCurrentLocation } from "@/src/services/locationService";
 import theme from "@/src/theme/theme";
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
-import { getCurrentPositionAsync } from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Alert, Text, TextInput, View } from "react-native";
@@ -37,13 +37,19 @@ export default function AddPlaceScreen() {
     useEffect(() => {
         const getLocation = async () => {
             try {
-                const location = await getCurrentPositionAsync({});
+                const location = await getCurrentLocation();
+                if (!location) {
+                    console.error("Could not fetch current location");
+                    return;
+                }
+
                 setRegion({
-                    latitude: location.coords.latitude,
-                    longitude: location.coords.longitude,
-                    latitudeDelta: 0.0922,
-                    longitudeDelta: 0.0421,
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
                 });
+                console.log("[AddPlaceScreen] Fetched current location");
             } catch (error) {
                 console.error("Error getting location:", error);
             }

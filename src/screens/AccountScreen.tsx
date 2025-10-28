@@ -8,7 +8,7 @@ import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, Touchable
 import { SafeAreaView } from "react-native-safe-area-context";
 import { UserProfile } from "../models/database";
 import { onAuthStateChange, signInWithEmailPassword, signOutUser, signUpWithEmailPassword } from "../services/authService";
-import { getUserProfile, updateUserProfile } from "../services/databaseService";
+import { subscribeToUserProfile, updateUserProfile } from "../services/databaseService";
 import { getProfilePictureURL, uploadProfilePicture } from "../services/storageService";
 
 export default function AccountScreen() {
@@ -49,7 +49,7 @@ export default function AccountScreen() {
     useEffect(() => {
         if (!user) return;
 
-        const unsubscribe = getUserProfile(user.uid, (profile) => {
+        const unsubscribe = subscribeToUserProfile(user.uid, (profile) => {
             setUserProfile(profile);
             setDisplayName(profile?.displayName || '');
         });

@@ -1,7 +1,8 @@
 import { MemberLocation, Place } from '../models/database';
 import { getCurrentUser } from './authService';
-import { getGroupPlaces, getUserGroups } from './databaseService';
+import { getMultipleGroupPlaces, subscribeToUserGroupIds } from './databaseService';
 import { placeDetectionService } from './placeDetectionService';
+import { placeNotificationService } from './placeNotificationService';
 
 /**
  * Service to integrate location updates with place detection
@@ -11,6 +12,7 @@ class LocationPlaceIntegration {
     private allPlaces: Map<string, Place[]> = new Map(); // groupId -> places
     private unsubscribers: (() => void)[] = [];
     private placesById: Map<string, { place: Place; groupId: string }> = new Map(); // placeId -> {place, groupId}
+    private placesUnsubscriber: (() => void) | null = null;
 
     /**
      * Initialize listeners for all groups and their places
@@ -25,26 +27,38 @@ class LocationPlaceIntegration {
         // Clean up existing listeners
         this.cleanup();
 
-        // Listen to all user's groups
-        const groupsUnsubscribe = getUserGroups(user.uid, (groups) => {
-            console.log(`[LocationPlaceIntegration] Loaded ${groups.length} groups`);
+        this.placesUnsubscriber = null;
 
-            // For each group, listen to its places
-            groups.forEach((group) => {
-                const placesUnsubscribe = getGroupPlaces(group.id, (places) => {
-                    console.log(`[LocationPlaceIntegration] Group ${group.name}: ${places.length} places`);
-                    this.allPlaces.set(group.id, places);
+        // Listen to user's group IDs (lightweight)
+        const unsubscribeGroupIds = subscribeToUserGroupIds(user.uid, (groupIds) => {
+            console.log(`[LocationPlaceIntegration] Loaded ${groupIds.length} groups`);
+
+            // Unsubscribe previous places listener if exists
+            if (this.placesUnsubscriber) {
+                this.placesUnsubscriber();
+            }
+
+            // Listen to places for all groups
+            const unsubscribePlaces = getMultipleGroupPlaces(groupIds, (allPlaces) => {
+                // Update the internal state
+                Object.entries(allPlaces).forEach(([groupId, places]) => {
+                    this.allPlaces.set(groupId, places);
 
                     // Update places by ID map for easy lookup
                     places.forEach((place) => {
-                        this.placesById.set(place.id, { place, groupId: group.id });
+                        this.placesById.set(place.id, { place, groupId });
+                        // Also update the place notification service cache
+                        placeNotificationService.updatePlaceNames(place.id, place.name);
                     });
                 });
-                this.unsubscribers.push(placesUnsubscribe);
+
+                console.log(`[LocationPlaceIntegration] Total places loaded: ${this.placesById.size}`);
             });
+
+            this.placesUnsubscriber = unsubscribePlaces;
         });
 
-        this.unsubscribers.push(groupsUnsubscribe);
+        this.unsubscribers.push(unsubscribeGroupIds);
     }
 
     /**
@@ -75,6 +89,10 @@ class LocationPlaceIntegration {
      * Cleanup all listeners
      */
     cleanup(): void {
+        if (this.placesUnsubscriber) {
+            this.placesUnsubscriber();
+            this.placesUnsubscriber = null;
+        }
         this.unsubscribers.forEach(unsubscribe => unsubscribe());
         this.unsubscribers = [];
         this.allPlaces.clear();

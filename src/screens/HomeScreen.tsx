@@ -2,7 +2,11 @@ import MapProfilePicture from '@/src/components/MapProfilePicture';
 import ThemedButton from '@/src/components/ThemedButton';
 import { MemberLocation, Place, UserWithLocation } from '@/src/models/database';
 import { onAuthStateChange } from '@/src/services/authService';
-import { getGroupPlaces, getGroupPositions, getUserGroups } from '@/src/services/databaseService';
+import {
+    getMultipleGroupPlaces,
+    subscribeToMultipleGroupPositions,
+    subscribeToUserGroupIds
+} from '@/src/services/databaseService';
 import theme from '@/src/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { User } from 'firebase/auth';
@@ -49,6 +53,10 @@ function HomeScreen() {
     const [allPositions, setAllPositions] = useState<{ [groupId: string]: { [userId: string]: MemberLocation } }>({});
     const [allPlaces, setAllPlaces] = useState<{ [groupId: string]: Place[] }>({});
 
+    // Refs to track current subscriptions for proper cleanup
+    const positionSubscriptionRef = useRef<(() => void) | null>(null);
+    const placesSubscriptionRef = useRef<(() => void) | null>(null);
+
     // Auth state listener
     useEffect(() => {
         const unsubscribeAuth = onAuthStateChange((currentUser) => {
@@ -58,48 +66,57 @@ function HomeScreen() {
         return unsubscribeAuth;
     }, []);
 
-    // Groups, positions, and places listeners
+    // Listen to user's group IDs, then positions and places for those groups
     useEffect(() => {
         if (!user) {
             setAllPositions({});
             setAllPlaces({});
+            // Clean up any existing subscriptions
+            if (positionSubscriptionRef.current) {
+                positionSubscriptionRef.current();
+                positionSubscriptionRef.current = null;
+            }
+            if (placesSubscriptionRef.current) {
+                placesSubscriptionRef.current();
+                placesSubscriptionRef.current = null;
+            }
             return;
         }
 
-        let positionUnsubscribers: (() => void)[] = [];
-        let placesUnsubscribers: (() => void)[] = [];
+        const unsubscribeGroupIds = subscribeToUserGroupIds(user.uid, (groupIds) => {
+            console.log(`[HomeScreen] Watching ${groupIds.length} groups`);
 
-        const unsubscribeGroups = getUserGroups(user.uid, (userGroups) => {
-            // Clean up old listeners
-            positionUnsubscribers.forEach(unsubscribe => unsubscribe());
-            placesUnsubscribers.forEach(unsubscribe => unsubscribe());
-            positionUnsubscribers = [];
-            placesUnsubscribers = [];
+            // Clean up previous subscriptions before setting up new ones
+            if (positionSubscriptionRef.current) {
+                positionSubscriptionRef.current();
+            }
+            if (placesSubscriptionRef.current) {
+                placesSubscriptionRef.current();
+            }
 
-            // Set up position and places listeners for all groups
-            userGroups.forEach((group) => {
-                const unsubscribePositions = getGroupPositions(group.id, (positions) => {
-                    setAllPositions(prev => ({
-                        ...prev,
-                        [group.id]: positions
-                    }));
-                });
-                positionUnsubscribers.push(unsubscribePositions);
+            // Now listen to positions and places for these specific groups only
+            positionSubscriptionRef.current = subscribeToMultipleGroupPositions(groupIds, (positions) => {
+                setAllPositions(positions);
+                console.log(`[HomeScreen] Updated positions for ${Object.keys(positions).length} groups`);
+            });
 
-                const unsubscribePlaces = getGroupPlaces(group.id, (places) => {
-                    setAllPlaces(prev => ({
-                        ...prev,
-                        [group.id]: places
-                    }));
-                });
-                placesUnsubscribers.push(unsubscribePlaces);
+            placesSubscriptionRef.current = getMultipleGroupPlaces(groupIds, (places) => {
+                setAllPlaces(places);
+                console.log(`[HomeScreen] Updated places for ${Object.keys(places).length} groups`);
             });
         });
 
         return () => {
-            unsubscribeGroups();
-            positionUnsubscribers.forEach(unsubscribe => unsubscribe());
-            placesUnsubscribers.forEach(unsubscribe => unsubscribe());
+            unsubscribeGroupIds();
+            // Clean up position and place subscriptions on unmount
+            if (positionSubscriptionRef.current) {
+                positionSubscriptionRef.current();
+                positionSubscriptionRef.current = null;
+            }
+            if (placesSubscriptionRef.current) {
+                placesSubscriptionRef.current();
+                placesSubscriptionRef.current = null;
+            }
         };
     }, [user]);
 

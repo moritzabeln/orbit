@@ -5,6 +5,54 @@ import app from './firebaseConfig';
 
 const database = getDatabase(app);
 
+/**
+ * Add a group reference to a user's groups list
+ * Stored at: users/{userId}/groups/{groupId}
+ * @param userId - The user ID
+ * @param groupId - The group ID
+ * @param groupName - The group name (for easy reference)
+ */
+const addGroupToUser = async (userId: string, groupId: string, groupName: string) => {
+    const userGroupRef = ref(database, `users/${userId}/groups/${groupId}`);
+    await set(userGroupRef, {
+        name: groupName,
+        joinedAt: Date.now()
+    });
+};
+
+/**
+ * Remove a group reference from a user's groups list
+ * @param userId - The user ID
+ * @param groupId - The group ID
+ */
+export const removeGroupFromUser = async (userId: string, groupId: string) => {
+    const userGroupRef = ref(database, `users/${userId}/groups/${groupId}`);
+    await remove(userGroupRef);
+};
+
+/**
+ * Get all group IDs for a user (lightweight - just IDs)
+ * This is more efficient than getUserGroups when you only need group IDs
+ * @param userId - The user ID
+ * @param callback - Callback function that receives array of group IDs
+ * @returns Unsubscribe function
+ */
+export const subscribeToUserGroupIds = (userId: string, callback: (groupIds: string[]) => void) => {
+    const userGroupsRef = ref(database, `users/${userId}/groups`);
+
+    const listener = onValue(userGroupsRef, (snapshot) => {
+        console.log(`[DatabaseService] Received group IDs update for user ${userId}`);
+        const groupIds: string[] = [];
+        snapshot.forEach((childSnapshot) => {
+            groupIds.push(childSnapshot.key!);
+        });
+        callback(groupIds);
+    });
+
+    return () => off(userGroupsRef, 'value', listener);
+};
+
+
 export const createGroup = async (name: string): Promise<string> => {
     const user = getCurrentUser();
     if (!user) {
@@ -13,6 +61,7 @@ export const createGroup = async (name: string): Promise<string> => {
 
     const groupsRef = ref(database, 'groups');
     const newGroupRef = push(groupsRef);
+    const groupId = newGroupRef.key!;
 
     const groupData: Omit<Group, 'id'> = {
         name,
@@ -20,42 +69,99 @@ export const createGroup = async (name: string): Promise<string> => {
         createdAt: Date.now(),
         members: {
             [user.uid]: true
-        }
+        },
+        membersAtPlaces: {},
+        positions: {},
+        places: {},
     };
 
     await set(newGroupRef, groupData);
-    return newGroupRef.key!;
+
+    // Also add group to user's groups list
+    await addGroupToUser(user.uid, groupId, name);
+
+    return groupId;
 };
 
 /**
- * Get all groups that a user is a member of
- * @param userId - The user ID
- * @param callback - Callback function that receives the array of groups
- * @returns Unsubscribe function
+ * Get group name by ID
+ * @param groupId - The group ID
+ * @returns Promise that resolves to the group name or null if not found
  */
-export const getUserGroups = (userId: string, callback: (groups: Group[]) => void) => {
-    const groupsRef = ref(database, 'groups');
+export const getGroupNameAsync = async (groupId: string): Promise<string | null> => {
+    const groupRef = ref(database, `groups/${groupId}/name`);
+    const snapshot = await get(groupRef);
+    if (snapshot.exists()) {
+        return snapshot.val() as string;
+    }
+    return null;
+}
 
-    const listener = onValue(groupsRef, (snapshot) => {
-        const groups: Group[] = [];
-        snapshot.forEach((childSnapshot) => {
-            const group = childSnapshot.val() as Omit<Group, 'id'>;
-            if (group.members && group.members[userId]) {
-                groups.push({
-                    id: childSnapshot.key!,
-                    ...group
-                });
-            }
+/**
+ * Listen to positions for multiple groups efficiently
+ * This sets up individual listeners for each group's positions
+ * @param groupIds - Array of group IDs to listen to
+ * @param callback - Callback that receives all positions grouped by groupId
+ * @returns Unsubscribe function that cleans up all listeners
+ */
+export const subscribeToMultipleGroupPositions = (
+    groupIds: string[],
+    callback: (allPositions: { [groupId: string]: { [userId: string]: MemberLocation } }) => void
+) => {
+    const unsubscribers: (() => void)[] = [];
+    const allPositions: { [groupId: string]: { [userId: string]: MemberLocation } } = {};
+
+    groupIds.forEach((groupId) => {
+        const unsubscribe = subscribeToGroupPositions(groupId, (positions) => {
+            allPositions[groupId] = positions;
+            callback({ ...allPositions });
         });
-        callback(groups);
+        unsubscribers.push(unsubscribe);
     });
 
-    return () => off(groupsRef, 'value', listener);
+    return () => {
+        unsubscribers.forEach(unsub => unsub());
+    };
 };
+
+/**
+ * Listen to places for multiple groups efficiently
+ * This sets up individual listeners for each group's places
+ * @param groupIds - Array of group IDs to listen to
+ * @param callback - Callback that receives all places grouped by groupId
+ * @returns Unsubscribe function that cleans up all listeners
+ */
+export const getMultipleGroupPlaces = (
+    groupIds: string[],
+    callback: (allPlaces: { [groupId: string]: Place[] }) => void
+) => {
+    const unsubscribers: (() => void)[] = [];
+    const allPlaces: { [groupId: string]: Place[] } = {};
+
+    groupIds.forEach((groupId) => {
+        const unsubscribe = subscribeToGroupPlaces(groupId, (places) => {
+            allPlaces[groupId] = places;
+            callback({ ...allPlaces });
+        });
+        unsubscribers.push(unsubscribe);
+    });
+
+    return () => {
+        unsubscribers.forEach(unsub => unsub());
+    };
+};
+
 
 export const addGroupMember = async (groupId: string, userId: string) => {
     const memberRef = ref(database, `groups/${groupId}/members/${userId}`);
     await set(memberRef, true);
+
+    // Also add group to user's groups list
+    const groupSnapshot = await get(ref(database, `groups/${groupId}`));
+    const groupData = groupSnapshot.val();
+    if (groupData) {
+        await addGroupToUser(userId, groupId, groupData.name);
+    }
 };
 
 export const updateMemberPosition = async (groupId: string, userId: string, latitude: number, longitude: number) => {
@@ -67,32 +173,45 @@ export const updateMemberPosition = async (groupId: string, userId: string, lati
     });
 };
 
+/**
+ * Update position of a user in all their groups
+ * @param userId - The user ID
+ * @param location - The location data
+ */
 export const updatePositionInAllGroups = async (userId: string, location: MemberLocation) => {
     // First get all groups the user is in
-    const groupsRef = ref(database, 'groups');
-    const snapshot = await get(groupsRef);
+    const userGroupsRef = ref(database, `users/${userId}/groups`);
+    const snapshot = await get(userGroupsRef);
+    if (!snapshot.exists()) {
+        return;
+    }
 
     const updatePromises: Promise<void>[] = [];
-
-    snapshot.forEach((childSnapshot: any) => {
-        const group = childSnapshot.val() as Omit<Group, 'id'>;
-        if (group.members && group.members[userId]) {
-            // User is a member of this group, update their position
-            const positionRef = ref(database, `groups/${childSnapshot.key}/positions/${userId}`);
-            updatePromises.push(set(positionRef, {
-                ...location,
-                lastUpdated: Date.now()
-            }));
-        }
+    snapshot.forEach((childSnapshot) => {
+        const groupId = childSnapshot.key!;
+        const positionRef = ref(database, `groups/${groupId}/positions/${userId}`);
+        const updatePromise = set(positionRef, {
+            ...location,
+            lastUpdated: Date.now()
+        });
+        updatePromises.push(updatePromise);
     });
 
     await Promise.all(updatePromises);
 };
 
-export const getGroupPositions = (groupId: string, callback: (positions: { [userId: string]: MemberLocation }) => void) => {
+/**
+ * Subscribe to position updates for a specific group
+ * @param groupId - The group ID
+ * @param callback - Callback function that receives the positions data of each update
+ * @returns Unsubscribe function
+ */
+export const subscribeToGroupPositions = (groupId: string, callback: (positions: { [userId: string]: MemberLocation }) => void) => {
     const positionsRef = ref(database, `groups/${groupId}/positions`);
 
+    console.log(`[DatabaseService] Subscribing to position updates for group ${groupId}`);
     const listener = onValue(positionsRef, (snapshot) => {
+        console.log(`[DatabaseService] Received position update for group ${groupId}`);
         const positions: { [userId: string]: MemberLocation } = {};
         snapshot.forEach((childSnapshot) => {
             const positionData = childSnapshot.val();
@@ -108,59 +227,69 @@ export const getGroupPositions = (groupId: string, callback: (positions: { [user
         callback(positions);
     });
 
-    return () => off(positionsRef, 'value', listener);
-};
+    return () => {
+        console.log(`[DatabaseService] Unsubscribing from position updates for group ${groupId}`);
+        off(positionsRef, 'value', listener);
+    };
+}
 
 /**
- * Get all members in a group (returns member IDs and basic profile info)
- * This is more appropriate than getGroupPositions when you just need to display members
+ * Subscribe to members of a specific group. Fetches user profiles as well.
  * @param groupId - The group ID
- * @param callback - Callback function that receives the array of group members
+ * @param callback - Callback that is called every time the members list changes. Receives an array of UserWithProfile.
  * @returns Unsubscribe function
  */
-export const getGroupMembers = (groupId: string, callback: (members: UserWithProfile[]) => void) => {
-    const groupRef = ref(database, `groups/${groupId}`);
+export const subscribeToGroupMembers = (groupId: string, callback: (members: UserWithProfile[]) => void) => {
+    const membersRef = ref(database, `groups/${groupId}/members`);
 
-    const listener = onValue(groupRef, async (snapshot) => {
-        const groupData = snapshot.val();
+    console.log(`[DatabaseService] Subscribing to members of group ${groupId}`);
+    const listener = onValue(membersRef, async (snapshot) => {
+        console.log(`[DatabaseService] Received members update for group ${groupId}`);
+        const membersData = snapshot.val();
 
-        if (!groupData || !groupData.members) {
+        if (!membersData) {
             callback([]);
             return;
         }
 
-        const userIds = Object.keys(groupData.members);
+        const userIds = Object.keys(membersData);
         const members: UserWithProfile[] = [];
 
-        // Fetch user profiles for each member
-        for (const userId of userIds) {
+        // Fetch user profiles in parallel for better performance
+        const profilePromises = userIds.map(async (userId) => {
             const userProfileRef = ref(database, `users/${userId}/profile`);
             try {
                 const userSnapshot = await get(userProfileRef);
                 const userProfile = userSnapshot.val() as UserProfile | null;
 
-                members.push({
+                return {
                     userId: userId,
                     profile: userProfile || {
                         displayName: 'Unknown User'
                     }
-                });
+                };
             } catch (error) {
                 console.error(`Error fetching user profile for ${userId}:`, error);
                 // Still add the user with just their ID
-                members.push({
+                return {
                     userId: userId,
                     profile: {
                         displayName: 'Unknown User'
                     }
-                });
+                };
             }
-        }
+        });
+
+        const resolvedMembers = await Promise.all(profilePromises);
+        members.push(...resolvedMembers);
 
         callback(members);
     });
 
-    return () => off(groupRef, 'value', listener);
+    return () => {
+        console.log(`[DatabaseService] Unsubscribing from members of group ${groupId}`);
+        off(membersRef, 'value', listener);
+    };
 };
 
 /**
@@ -186,12 +315,12 @@ export const updateUserProfile = async (userId: string, profileData: Partial<Use
 };
 
 /**
- * Get user profile from the database
+ * Subscribe to user profile updates
  * @param userId - The user ID
- * @param callback - Callback function that receives the user profile
+ * @param callback - Callback function that receives the user profile updates
  * @returns Unsubscribe function
  */
-export const getUserProfile = (userId: string, callback: (profile: UserProfile | null) => void) => {
+export const subscribeToUserProfile = (userId: string, callback: (profile: UserProfile | null) => void) => {
     const profileRef = ref(database, `users/${userId}/profile`);
 
     const listener = onValue(profileRef, (snapshot) => {
@@ -201,6 +330,17 @@ export const getUserProfile = (userId: string, callback: (profile: UserProfile |
 
     return () => off(profileRef, 'value', listener);
 };
+
+/**
+ * Get user profile once
+ * @param userId - The user ID
+ * @returns Promise that resolves to the user profile or null if not found
+ */
+export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
+    const profileRef = ref(database, `users/${userId}/profile`);
+    const snapshot = await get(profileRef);
+    return snapshot.val() as UserProfile | null;
+}
 
 /**
  * Update user's battery level in the database
@@ -256,12 +396,12 @@ export const updatePlace = async (groupId: string, placeId: string, place: { nam
 };
 
 /**
- * Get all places for a group
+ * Subscribe to changes in places for a specific group
  * @param groupId - The group ID
- * @param callback - Callback function that receives the array of places
+ * @param callback - Callback function that receives the array of places. Called every time the places change.
  * @returns Unsubscribe function
  */
-export const getGroupPlaces = (groupId: string, callback: (places: Place[]) => void) => {
+export const subscribeToGroupPlaces = (groupId: string, callback: (places: Place[]) => void) => {
     const placesRef = ref(database, `groups/${groupId}/places`);
 
     const listener = onValue(placesRef, (snapshot) => {
@@ -297,6 +437,12 @@ export const setMemberAtPlace = async (
     data: MemberAtPlace
 ) => {
     const memberAtPlaceRef = ref(database, `groups/${groupId}/membersAtPlaces/${placeId}/${userId}`);
+    // Check if member already exists to avoid overwriting arrival time
+    const snapshot = await get(memberAtPlaceRef);
+    if (snapshot.exists()) {
+        console.log(`[DatabaseService] Member ${userId} already at place ${placeId} in group ${groupId}, not overwriting`);
+        return;
+    }
     await set(memberAtPlaceRef, data);
 };
 
@@ -316,12 +462,12 @@ export const removeMemberFromPlace = async (
 };
 
 /**
- * Get all members at places for a group
+ * Subscribe to membersAtPlaces for a specific group.
  * @param groupId - The group ID
- * @param callback - Callback function that receives the members at places data
+ * @param callback - Callback function that receives the members at places data. Called every time the members at a place change.
  * @returns Unsubscribe function
  */
-export const getMembersAtPlaces = (
+export const subscribeToMembersAtPlaces = (
     groupId: string,
     callback: (data: { [placeId: string]: { [userId: string]: MemberAtPlace } }) => void
 ) => {

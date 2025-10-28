@@ -22,7 +22,9 @@ interface PlaceDetectionState {
 }
 
 /**
- * Service to manage location caching and place detection
+ * Service to manage location caching and place detection.
+ * Detects when a user is present at defined places based on location updates.
+ * Caches the last X location updates and requires Y consecutive detections to confirm presence in a place.
  */
 class PlaceDetectionService {
     private locationCache: LocationCacheEntry[] = [];
@@ -143,6 +145,7 @@ class PlaceDetectionService {
                             arrivedAt: Date.now(),
                             userId: user.uid
                         });
+                        console.log(`Current places: ${Array.from(this.currentPlaces).join(', ')}`);
                     }
                 } else {
                     // First detection

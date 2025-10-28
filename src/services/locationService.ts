@@ -1,7 +1,6 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-
-const LOCATION_TASK_NAME = 'BACKGROUND_LOCATION_TASK';
+import { LOCATION_TASK_NAME } from './locationTaskDefinition';
 
 export interface UserLocation {
     latitude: number;
@@ -62,6 +61,9 @@ export const startBackgroundLocationUpdates = async (): Promise<boolean> => {
     try {
         // Check if task is already registered
         const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+        console.log(`[Background Location] Task registered: ${isRegistered}`);
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         if (isRegistered) {
             // For debugging.
@@ -75,29 +77,57 @@ export const startBackgroundLocationUpdates = async (): Promise<boolean> => {
             }
         }
 
+        let tasks = await TaskManager.getRegisteredTasksAsync();
+        console.log(`[Background Location] Registered tasks: ${JSON.stringify(tasks)}`);
+
+        const isBackgroundLocationAvailableAsync = await Location.isBackgroundLocationAvailableAsync();
+        const hasServicesEnabledAsync = await Location.hasServicesEnabledAsync();
+        console.log(`[Background Location] isBackgroundLocationAvailable: ${isBackgroundLocationAvailableAsync}, hasServicesEnabled: ${hasServicesEnabledAsync}`);
+        // Wait for a short moment to ensure the checks are complete
+
+        console.log('[Background Location] Waiting briefly to ensure services are ready...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
         // Request background permissions
+        const hasForegroundPermission = await requestLocationPermissions();
+        if (!hasForegroundPermission) {
+            console.warn('[Background Location] Foreground permission denied');
+            return false;
+        }
         const hasBackgroundPermission = await requestBackgroundLocationPermissions();
         if (!hasBackgroundPermission) {
             console.warn('[Background Location] Background permission denied');
             return false;
         }
 
+        console.log(`[Background Location] Starting location updates with task name: ${LOCATION_TASK_NAME}`);
         // Start location updates
+        await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest }); // Warm up location services
         await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
             accuracy: Location.Accuracy.Highest,
-            timeInterval: 10000, // Update every 10 seconds in background
-            distanceInterval: 10, // Or when moved 10 meters
-            deferredUpdatesInterval: 30000,
+            activityType: Location.ActivityType.Fitness,
+            timeInterval: 1000, // Update every 1 second in background
+            distanceInterval: 0,
+            deferredUpdatesInterval: 5000,
             foregroundService: {
                 notificationTitle: 'Orbit is tracking your location',
                 notificationBody: 'Sharing location with your groups',
                 killServiceOnDestroy: false,
             },
+            showsBackgroundLocationIndicator: true,
             pausesUpdatesAutomatically: false,
-            activityType: Location.ActivityType.Fitness,
+            mayShowUserSettingsDialog: true,
         });
+        await Location.watchPositionAsync({ accuracy: Location.Accuracy.Highest, timeInterval: 1000 }, (e) => {
+            console.log(`[Background Location] Position changed: ${JSON.stringify(e)}`);
+        });
+        await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest }); // Warm up location services
 
         console.log('[Background Location] Started');
+
+        tasks = await TaskManager.getRegisteredTasksAsync();
+        console.log(`[Background Location] Registered tasks: ${JSON.stringify(tasks)}`);
+
         return true;
     } catch (error) {
         console.error('[Background Location] Error starting:', error);

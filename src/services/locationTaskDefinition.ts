@@ -6,7 +6,7 @@ import { getBatteryInfo } from './batteryService';
 import { updatePositionInAllGroups, updateUserBattery } from './databaseService';
 import { locationPlaceIntegration } from './locationPlaceIntegration';
 
-const LOCATION_TASK_NAME = 'BACKGROUND_LOCATION_TASK';
+export const LOCATION_TASK_NAME = 'orbit-background-location-task';
 
 /**
  * Define the background location task at the global scope
@@ -15,7 +15,11 @@ const LOCATION_TASK_NAME = 'BACKGROUND_LOCATION_TASK';
  * This file is imported at the app's entry point to ensure the task
  * is defined before it's registered or executed in the background.
  */
+
+console.log(`[Location Task] Defining background location task: ${LOCATION_TASK_NAME}`);
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }: any) => {
+    console.log('[Location Task] Task executed');
+
     if (error) {
         console.error('[Location Task] Error:', error);
         return;
@@ -53,8 +57,8 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }: any) => {
                 const batteryInfo = await getBatteryInfo();
                 if (batteryInfo.level >= 0) {
                     await updateUserBattery(user.uid, batteryInfo.level, batteryInfo.state);
-                    console.log(`[Background Task] Position & Battery updated: ${batteryInfo.level}%, charging: ${batteryInfo.isCharging}`);
                 }
+                console.log(`[Background Task] Position & Battery updated: ${batteryInfo.level}%, charging: ${batteryInfo.isCharging}`);
             } catch (error) {
                 console.error('[Background Task] Error updating position/battery:', error);
             }

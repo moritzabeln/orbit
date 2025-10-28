@@ -57,6 +57,7 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
  */
 export const scheduleLocalNotification = async (title: string, body: string): Promise<void> => {
     try {
+        console.log('Scheduling notification:', title, body);
         await Notifications.scheduleNotificationAsync({
             content: {
                 title,

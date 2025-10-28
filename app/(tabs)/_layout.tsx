@@ -1,31 +1,18 @@
-import { locationPlaceIntegration } from "@//src/services/locationPlaceIntegration";
-import {
-  notifyMemberArrived,
-  notifyMemberLeft,
-  requestNotificationPermissions
-} from "@//src/services/notificationService";
-import { onAuthStateChange } from "@/src/services/authService";
-import {
-  getMembersAtPlaces,
-  getUserGroups,
-  getUserProfile
-} from "@/src/services/databaseService";
-import {
-  startBackgroundLocationUpdates,
-  stopBackgroundLocationUpdates
-} from "@/src/services/locationService";
 // Import the task definition at the global scope
 // This ensures TaskManager.defineTask is called before the task is registered
 import "@/src/services/locationTaskDefinition";
+
+import { locationPlaceIntegration } from "@//src/services/locationPlaceIntegration";
+import { requestNotificationPermissions } from "@//src/services/notificationService";
+import { onAuthStateChange } from "@/src/services/authService";
+import { startBackgroundLocationUpdates, stopBackgroundLocationUpdates } from "@/src/services/locationService";
+import { placeNotificationService } from "@/src/services/placeNotificationService";
 import theme from "@/src/theme/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 
 export default function RootLayout() {
-  const previousMembersAtPlaces = useRef<{ [groupId: string]: { [placeId: string]: { [userId: string]: any } } }>({});
-  const unsubscribersRef = useRef<(() => void)[]>([]);
-
   useEffect(() => {
     // Request notification permissions on mount
     requestNotificationPermissions();
@@ -43,82 +30,20 @@ export default function RootLayout() {
         // Initialize location-place integration for place detection
         await locationPlaceIntegration.initialize();
 
-        // Set up listeners for notifications about other members at places
-        const groupsUnsubscribe = getUserGroups(user.uid, (groups) => {
-          // Clean up previous group listeners
-          unsubscribersRef.current.forEach(unsub => unsub());
-          unsubscribersRef.current = [];
-
-          groups.forEach((group) => {
-            // Listen for members at places changes in this group
-            const membersAtPlacesUnsubscribe = getMembersAtPlaces(group.id, async (membersAtPlaces) => {
-              const previous = previousMembersAtPlaces.current[group.id] || {};
-
-              // Check for arrivals and departures
-              for (const placeId in membersAtPlaces) {
-                const currentMembers = membersAtPlaces[placeId];
-                const previousMembers = previous[placeId] || {};
-
-                // Get place info from locationPlaceIntegration
-                const placeInfo = locationPlaceIntegration.getPlaceById(placeId);
-                const placeName = placeInfo?.place.name || 'a place';
-
-                // Check for new arrivals (members in current but not in previous)
-                for (const userId in currentMembers) {
-                  if (userId === user.uid) continue; // Skip notifications for current user
-
-                  if (!previousMembers[userId]) {
-                    // Member arrived - fetch their profile
-                    getUserProfile(userId, async (profile) => {
-                      const memberName = profile?.displayName || 'Someone';
-                      await notifyMemberArrived(memberName, placeName);
-                      console.log(`[App] Notification: ${memberName} arrived at ${placeName}`);
-                    });
-                  }
-                }
-
-                // Check for departures (members in previous but not in current)
-                for (const userId in previousMembers) {
-                  if (userId === user.uid) continue; // Skip notifications for current user
-
-                  if (!currentMembers[userId]) {
-                    // Member left - fetch their profile
-                    getUserProfile(userId, async (profile) => {
-                      const memberName = profile?.displayName || 'Someone';
-                      await notifyMemberLeft(memberName, placeName);
-                      console.log(`[App] Notification: ${memberName} left ${placeName}`);
-                    });
-                  }
-                }
-              }
-
-              // Update the reference for next comparison
-              if (!previousMembersAtPlaces.current[group.id]) {
-                previousMembersAtPlaces.current[group.id] = {};
-              }
-              previousMembersAtPlaces.current[group.id] = membersAtPlaces;
-            });
-
-            unsubscribersRef.current.push(membersAtPlacesUnsubscribe);
-          });
-        });
-
-        return () => {
-          groupsUnsubscribe();
-          unsubscribersRef.current.forEach(unsub => unsub());
-          unsubscribersRef.current = [];
-        };
+        // Start place notification service
+        await placeNotificationService.start();
+        console.log('[App] Place notification service started');
       } else {
+        // Stop services when user logs out
         await stopBackgroundLocationUpdates();
         locationPlaceIntegration.cleanup();
-        console.log('[App] Location tracking stopped');
+        placeNotificationService.stop();
+        console.log('[App] All location services stopped');
       }
     });
 
     return () => {
       authUnsubscribe();
-      unsubscribersRef.current.forEach(unsub => unsub());
-      unsubscribersRef.current = [];
     };
   }, []);
 

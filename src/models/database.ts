@@ -46,6 +46,9 @@ export interface Group {
     createdBy: string;
     createdAt: number;
     members: { [userId: string]: boolean };
+    membersAtPlaces: { [placeId: string]: { [userId: string]: MemberAtPlace } };
+    positions: { [userId: string]: MemberLocation };
+    places: { [placeId: string]: Place };
 }
 
 /**

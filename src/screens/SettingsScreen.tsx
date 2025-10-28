@@ -1,23 +1,24 @@
 import GroupMemberCard from "@/src/components/GroupMemberCard";
 import PageHeader from "@/src/components/PageHeader";
 import ThemedButton from "@/src/components/ThemedButton";
+import { getGroupNameAsync, subscribeToGroupMembers, subscribeToGroupPlaces, subscribeToUserGroupIds } from "@/src/services/databaseService";
 import theme from "@/src/theme/theme";
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { FlatList, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Group, Place, UserWithProfile } from "../models/database";
+import { Place, UserWithProfile } from "../models/database";
 import { getCurrentUser, onAuthStateChange } from "../services/authService";
-import { getGroupMembers, getGroupPlaces, getUserGroups } from "../services/databaseService";
 
 export default function SettingsScreen() {
     const router = useRouter();
-    const [groups, setGroups] = useState<Group[]>([]);
+    const [groupIds, setGroupIds] = useState<string[]>([]);
     const [user, setUser] = useState(getCurrentUser());
     const [groupMembers, setGroupMembers] = useState<{ [groupId: string]: UserWithProfile[] }>({});
     const [activeTabs, setActiveTabs] = useState<{ [groupId: string]: 'people' | 'places' }>({});
     const [groupPlaces, setGroupPlaces] = useState<{ [groupId: string]: Place[] }>({});
+    const [groupNames, setGroupNames] = useState<{ [groupId: string]: string }>({});
 
     useEffect(() => {
         const unsubscribeAuth = onAuthStateChange((currentUser) => {
@@ -31,35 +32,35 @@ export default function SettingsScreen() {
 
     useEffect(() => {
         if (!user) {
-            setGroups([]);
+            setGroupIds([]);
             setGroupMembers({});
             return;
         }
 
         let userUnsubscribers: (() => void)[] = [];
 
-        const unsubscribeGroups = getUserGroups(user.uid, (userGroups) => {
-            setGroups(userGroups);
+        const unsubscribeGroups = subscribeToUserGroupIds(user.uid, (userGroupIds) => {
+            setGroupIds(userGroupIds);
 
             // Clean up old user listeners
             userUnsubscribers.forEach(unsubscribe => unsubscribe());
             userUnsubscribers = [];
 
             // Set up user listeners for all groups to get member data
-            userGroups.forEach((group) => {
-                const unsubscribeUsers = getGroupMembers(group.id, (members) => {
+            userGroupIds.forEach((groupId) => {
+                const unsubscribeUsers = subscribeToGroupMembers(groupId, (members) => {
                     setGroupMembers(prev => ({
                         ...prev,
-                        [group.id]: members
+                        [groupId]: members
                     }));
                 });
                 userUnsubscribers.push(unsubscribeUsers);
 
                 // Set up places listeners for all groups
-                const unsubscribePlaces = getGroupPlaces(group.id, (places) => {
+                const unsubscribePlaces = subscribeToGroupPlaces(groupId, (places) => {
                     setGroupPlaces(prev => ({
                         ...prev,
-                        [group.id]: places
+                        [groupId]: places
                     }));
                 });
                 userUnsubscribers.push(unsubscribePlaces);
@@ -71,6 +72,26 @@ export default function SettingsScreen() {
             userUnsubscribers.forEach(unsubscribe => unsubscribe());
         };
     }, [user]);
+
+    // Fetch group names when groupIds change
+    useEffect(() => {
+        const fetchGroupNames = async () => {
+            const names: { [groupId: string]: string } = {};
+            await Promise.all(
+                groupIds.map(async (groupId) => {
+                    const name = await getGroupNameAsync(groupId);
+                    names[groupId] = name || 'Unknown Group';
+                })
+            );
+            setGroupNames(names);
+        };
+
+        if (groupIds.length > 0) {
+            fetchGroupNames();
+        } else {
+            setGroupNames({});
+        }
+    }, [groupIds]);
 
     const renderPlaceItem = ({ item, groupId }: { item: Place, groupId: string }) => (
         <View style={{
@@ -118,9 +139,9 @@ export default function SettingsScreen() {
         </View>
     );
 
-    const renderGroupItem = ({ item }: { item: Group }) => {
-        const members = groupMembers[item.id] || [];
-        const activeTab = activeTabs[item.id] || 'people';
+    const renderGroupItem = ({ item }: { item: string }) => {
+        const members = groupMembers[item] || [];
+        const activeTab = activeTabs[item] || 'people';
 
         return (
             <View style={{
@@ -137,7 +158,7 @@ export default function SettingsScreen() {
                     color: theme.Colors.Text.Primary,
                     marginBottom: 12,
                 }}>
-                    {item.name}
+                    {groupNames[item]}
                 </Text>
                 <View style={{ flexDirection: 'row', marginBottom: 12 }}>
                     <TouchableOpacity
@@ -149,7 +170,7 @@ export default function SettingsScreen() {
                             borderRadius: 4,
                             marginRight: 4,
                         }}
-                        onPress={() => setActiveTabs(prev => ({ ...prev, [item.id]: 'people' }))}
+                        onPress={() => setActiveTabs(prev => ({ ...prev, [item]: 'people' }))}
                     >
                         <Text style={{
                             fontSize: 14,
@@ -168,7 +189,7 @@ export default function SettingsScreen() {
                             borderRadius: 4,
                             marginLeft: 4,
                         }}
-                        onPress={() => setActiveTabs(prev => ({ ...prev, [item.id]: 'places' }))}
+                        onPress={() => setActiveTabs(prev => ({ ...prev, [item]: 'places' }))}
                     >
                         <Text style={{
                             fontSize: 14,
@@ -193,13 +214,13 @@ export default function SettingsScreen() {
                         <ThemedButton title="Add place" onPress={() => {
                             router.push({
                                 pathname: '/settings/group/add-place',
-                                params: { groupId: item.id }
+                                params: { groupId: item }
                             });
                         }} />
                         <FlatList
-                            data={groupPlaces[item.id] || []}
+                            data={groupPlaces[item] || []}
                             keyExtractor={(place) => place.id}
-                            renderItem={(placeInfo) => renderPlaceItem({ item: placeInfo.item, groupId: item.id })}
+                            renderItem={(placeInfo) => renderPlaceItem({ item: placeInfo.item, groupId: item })}
                             showsVerticalScrollIndicator={false}
                             style={{ width: '100%', marginTop: 12 }}
                         />
@@ -221,7 +242,7 @@ export default function SettingsScreen() {
                     router.navigate('/settings/create-group');
                 }} />
 
-                {groups.length > 0 && (
+                {groupIds.length > 0 && (
                     <>
                         <View style={{ height: theme.Spacing.Gap.Lg }} />
                         <Text style={{
@@ -234,8 +255,8 @@ export default function SettingsScreen() {
                             Your Groups
                         </Text>
                         <FlatList
-                            data={groups}
-                            keyExtractor={(item) => item.id}
+                            data={groupIds}
+                            keyExtractor={(item) => item}
                             renderItem={renderGroupItem}
                             showsVerticalScrollIndicator={false}
                             style={{ width: '100%' }}

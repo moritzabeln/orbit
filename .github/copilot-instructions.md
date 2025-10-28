@@ -4,6 +4,7 @@
 - Don't create documentation files unless explicitly asked.
 - Check online resources if unsure about specific libraries or APIs.
 - Follow modern best practices for React Native and TypeScript development.
+- ALWAYS look into method definitions before working with them or talking about them.
 
 ## Project Overview
 - This is an Expo React Native app using TypeScript
